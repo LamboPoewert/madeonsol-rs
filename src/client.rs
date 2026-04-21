@@ -112,7 +112,8 @@ impl HttpCore {
                     serde_json::Value::String(body_text.clone())
                 });
             let message = body_json
-                .get("message")
+                .get("error")
+                .or_else(|| body_json.get("message"))
                 .and_then(|m| m.as_str())
                 .map(String::from)
                 .unwrap_or_else(|| format!("Request failed with status {}", status));

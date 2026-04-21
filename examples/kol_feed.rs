@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for t in feed.trades {
         println!(
             "  {:>20}  bought  {:<10}  for {:>6.2} SOL",
-            t.kol_name.unwrap_or_else(|| t.wallet[..6].to_string()),
+            t.kol_name.unwrap_or_else(|| t.wallet_address[..6].to_string()),
             t.token_symbol.unwrap_or_else(|| "?".to_string()),
             t.sol_amount,
         );

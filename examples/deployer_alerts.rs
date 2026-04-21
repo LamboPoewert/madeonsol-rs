@@ -35,10 +35,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for a in alerts.alerts {
         println!(
             "  [{:?}] {:<10}  {:<22}  bonding rate {:.1}%",
-            a.tier,
+            a.deployers.tier,
             a.token_symbol.unwrap_or_else(|| "?".to_string()),
             a.token_name.unwrap_or_else(|| "?".to_string()),
-            a.bonding_rate_at_deploy * 100.0,
+            a.deployers.bonding_rate.unwrap_or(0.0) * 100.0,
         );
     }
 

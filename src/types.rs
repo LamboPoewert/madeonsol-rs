@@ -120,6 +120,8 @@ pub enum DeployerTier {
     Moderate,
     Rising,
     Cold,
+    #[serde(rename = "unranked")]
+    Unranked,
 }
 
 impl DeployerTier {
@@ -130,6 +132,7 @@ impl DeployerTier {
             Self::Moderate => "moderate",
             Self::Rising => "rising",
             Self::Cold => "cold",
+            Self::Unranked => "unranked",
         }
     }
 }
@@ -305,42 +308,109 @@ pub struct KolCoordinationParams {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct KolTrade {
-    pub signature: String,
+pub struct KolTradeDeployer {
     pub wallet: String,
+    pub tier: String,
+    #[serde(default)]
+    pub bonding_rate: Option<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct KolTrade {
+    pub tx_signature: String,
+    pub wallet_address: String,
+    #[serde(default)]
     pub kol_name: Option<String>,
+    #[serde(default)]
     pub kol_twitter: Option<String>,
     pub action: KolAction,
-    pub mint: String,
+    pub token_mint: String,
+    #[serde(default)]
     pub token_name: Option<String>,
+    #[serde(default)]
     pub token_symbol: Option<String>,
     pub sol_amount: f64,
     pub token_amount: f64,
-    pub price_usd: Option<f64>,
-    pub timestamp: String,
+    pub traded_at: String,
+    #[serde(default)]
+    pub kol_strategy_tag: Option<String>,
+    #[serde(default)]
+    pub kol_auto_strategy_tag: Option<String>,
+    #[serde(default)]
+    pub kol_winrate_7d: Option<f64>,
+    #[serde(default)]
+    pub kol_winrate_30d: Option<f64>,
+    #[serde(default)]
+    pub kol_early_entry_pct_30d: Option<f64>,
+    #[serde(default)]
+    pub kol_is_heating_up: Option<bool>,
+    #[serde(default)]
+    pub kol_percentile_pnl_7d: Option<f64>,
+    #[serde(default)]
+    pub kol_percentile_winrate_7d: Option<f64>,
+    #[serde(default)]
+    pub token_age_minutes: Option<f64>,
+    #[serde(default)]
+    pub deployer: Option<KolTradeDeployer>,
+    #[serde(default)]
+    pub deployer_tier: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct KolFeedResponse {
     pub trades: Vec<KolTrade>,
     pub count: u32,
+    #[serde(default)]
+    pub data_age_seconds: Option<u64>,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct KolLeaderboardEntry {
+    #[serde(default)]
+    pub name: Option<String>,
     pub wallet: String,
-    pub kol_name: Option<String>,
-    pub kol_twitter: Option<String>,
-    pub total_pnl_usd: f64,
-    pub win_rate: f64,
-    pub trade_count: u32,
-    pub rank: u32,
+    #[serde(default)]
+    pub strategy_tag: Option<String>,
+    #[serde(default)]
+    pub auto_strategy_tag: Option<String>,
+    pub pnl: f64,
+    pub buy_count: u64,
+    pub sell_count: u64,
+    pub volume: f64,
+    #[serde(default)]
+    pub win_rate: Option<f64>,
+    #[serde(default)]
+    pub avg_roi: Option<f64>,
+    #[serde(default)]
+    pub profit_factor: Option<f64>,
+    #[serde(default)]
+    pub early_entry_pct_30d: Option<f64>,
+    #[serde(default)]
+    pub consistency_7d: Option<f64>,
+    #[serde(default)]
+    pub is_heating_up: Option<bool>,
+    #[serde(default)]
+    pub is_cold: Option<bool>,
+    #[serde(default)]
+    pub percentile_pnl_7d: Option<f64>,
+    #[serde(default)]
+    pub percentile_winrate_7d: Option<f64>,
+    #[serde(default)]
+    pub percentile_pnl_30d: Option<f64>,
+    #[serde(default)]
+    pub percentile_winrate_30d: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct KolLeaderboardResponse {
     pub leaderboard: Vec<KolLeaderboardEntry>,
     pub period: String,
+    #[serde(default)]
+    pub sort: Option<String>,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -383,8 +453,8 @@ pub struct CoordinatedToken {
     pub token_name: Option<String>,
     pub token_symbol: Option<String>,
     pub kol_count: u32,
-    pub total_buys: f64,
-    pub total_sells: f64,
+    pub total_buys: u64,
+    pub total_sells: u64,
     pub net_sol_flow: f64,
     pub signal: String,
     pub avg_winrate_7d: Option<f64>,
@@ -401,7 +471,7 @@ pub struct CoordinatedToken {
     #[serde(default)]
     pub peak_kols: Option<u32>,
     #[serde(default)]
-    pub peak_buys: Option<u32>,
+    pub peak_buys: Option<u64>,
     #[serde(default)]
     pub exited_count: Option<u32>,
     #[serde(default)]
@@ -419,6 +489,12 @@ pub struct KolCoordinationResponse {
     pub score_version: Option<String>,
     #[serde(default)]
     pub window_minutes: Option<u32>,
+    #[serde(default)]
+    pub period: Option<String>,
+    #[serde(default)]
+    pub min_kols: Option<u32>,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -469,6 +545,8 @@ pub struct KolPairsResponse {
     pub pairs: Vec<KolPair>,
     pub period: String,
     pub min_shared: u32,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -535,6 +613,22 @@ pub struct HotToken {
     pub first_kol_buy_age_minutes: Option<f64>,
     #[serde(default)]
     pub kols: Option<Vec<KolPairMember>>,
+    #[serde(default)]
+    pub token_image_url: Option<String>,
+    #[serde(default)]
+    pub first_kol_buy_at: Option<String>,
+    #[serde(default)]
+    pub last_kol_buy_at: Option<String>,
+    #[serde(default)]
+    pub time_to_consensus_sec: Option<i64>,
+    #[serde(default)]
+    pub avg_winrate_7d: Option<f64>,
+    #[serde(default)]
+    pub entry_rank_avg: Option<f64>,
+    #[serde(default)]
+    pub unique_strategies: Option<u32>,
+    #[serde(default)]
+    pub strategies: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -542,6 +636,8 @@ pub struct KolHotTokensResponse {
     pub hot_tokens: Vec<HotToken>,
     pub period: String,
     pub min_kols: u32,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -665,6 +761,8 @@ pub struct KolTrendingResponse {
     pub trending: Vec<TrendingToken>,
     pub period: String,
     pub min_kols: u32,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 // ─── KOL entry-order / compare / alerts ─────────────────────────────────────
@@ -812,6 +910,8 @@ pub struct KolAlertsResponse {
     pub count: u32,
     pub window: String,
     pub types: Vec<String>,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 // ─── Coordination alerts (v1.1) ─────────────────────────────────────────────
@@ -883,6 +983,8 @@ pub struct CoordinationAlertUpdateParams {
 #[derive(Debug, Clone, Deserialize)]
 pub struct CoordinationAlertListResponse {
     pub rules: Vec<CoordinationAlertRule>,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -965,34 +1067,79 @@ pub struct RecentBondsParams {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct DeployerTierCounts {
+    pub elite: u32,
+    pub good: u32,
+    pub rising: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct DeployerStats {
-    pub total_deployers: u32,
-    pub elite_count: u32,
-    pub good_count: u32,
-    pub moderate_count: u32,
-    pub rising_count: u32,
-    pub cold_count: u32,
-    pub total_tokens_deployed: u32,
-    pub total_bonded: u32,
-    pub overall_bonding_rate: f64,
+    pub tracked_count: u32,
+    pub signals_today: u32,
+    pub bonds_detected: u32,
+    pub bond_rate: f64,
+    pub tiers: DeployerTierCounts,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
+// ─── Shared: DeployerSummary (used by RecentBond, DeployerAlert) ─────────────
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DeployerSummary {
+    pub wallet_address: String,
+    pub tier: DeployerTier,
+    #[serde(default)]
+    pub bonding_rate: Option<f64>,
+    #[serde(default)]
+    pub total_bonded: Option<u32>,
+    #[serde(default)]
+    pub recent_outcomes: Option<String>,
+    #[serde(default)]
+    pub recent_bond_rate: Option<f64>,
+    #[serde(default)]
+    pub total_tokens_deployed: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DeployerLeaderboardEntry {
-    pub wallet: String,
+    pub id: String,
+    pub wallet_address: String,
     pub tier: DeployerTier,
     pub bonding_rate: f64,
     pub recent_bond_rate: f64,
-    pub total_deployed: u32,
+    pub total_tokens_deployed: u32,
     pub total_bonded: u32,
+    #[serde(default)]
     pub last_deploy_at: Option<String>,
+    #[serde(default)]
+    pub recent_outcomes: Option<String>,
+    #[serde(default)]
+    pub avg_time_to_bond_minutes: Option<f64>,
+    #[serde(default)]
+    pub best_token_peak_mc: Option<f64>,
+    #[serde(default)]
+    pub avg_peak_mc: Option<f64>,
+    #[serde(default)]
+    pub last_bond_at: Option<String>,
+    #[serde(default)]
+    pub is_tracked: Option<bool>,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub first_seen_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DeployerLeaderboardResponse {
     pub deployers: Vec<DeployerLeaderboardEntry>,
-    pub count: u32,
     pub total: u32,
+    pub limit: u32,
+    pub offset: u32,
+    pub has_more: bool,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1028,64 +1175,140 @@ pub struct DeployerTokensResponse {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct KolBuysSummary {
+    pub count: u32,
+    pub total_sol: f64,
+    pub kols: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct DeployerAlert {
     pub id: String,
-    pub wallet: String,
-    pub tier: DeployerTier,
-    pub mint: String,
+    pub token_mint: String,
+    #[serde(default)]
     pub token_name: Option<String>,
+    #[serde(default)]
     pub token_symbol: Option<String>,
-    pub deployed_at: String,
-    pub bonding_rate_at_deploy: f64,
+    pub alert_type: String,
+    pub title: String,
+    pub message: String,
+    pub priority: String,
+    pub created_at: String,
+    #[serde(default)]
+    pub market_cap_at_alert: Option<f64>,
+    pub deployers: DeployerSummary,
+    #[serde(default)]
+    pub kol_buys: Option<KolBuysSummary>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DeployerAlertsResponse {
     pub alerts: Vec<DeployerAlert>,
-    pub count: u32,
+    pub limit: u32,
+    pub offset: u32,
+    #[serde(default)]
+    pub data_age_seconds: Option<u64>,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct BondRateStats {
+    pub total_deploys: u32,
+    pub total_bonded: u32,
+    pub rate: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct MultiplierStats {
+    pub total_with_mc: u32,
+    pub pct_2x: f64,
+    pub pct_5x: f64,
+    pub pct_10x: f64,
+    pub pct_50x: f64,
+    pub avg_multiplier: f64,
+    pub best_multiplier: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TierStats {
+    pub deploys: u32,
+    pub bonded: u32,
+    pub bond_rate: f64,
+    #[serde(default)]
+    pub avg_multiplier: Option<f64>,
+    pub total_with_mc: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct DeployerAlertStats {
+    pub bond_rate: BondRateStats,
+    pub multiplier: MultiplierStats,
+    pub tiers: HashMap<String, TierStats>,
     pub period: String,
-    pub total_alerts: u32,
-    pub by_tier: HashMap<String, u32>,
-    pub bonded_count: u32,
-    pub bonding_rate: f64,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BestToken {
-    pub mint: String,
-    pub name: Option<String>,
-    pub symbol: Option<String>,
+    pub id: String,
+    pub token_mint: String,
+    #[serde(default)]
+    pub token_name: Option<String>,
+    #[serde(default)]
+    pub token_symbol: Option<String>,
+    #[serde(default)]
+    pub token_image_url: Option<String>,
+    pub bonded_at: String,
+    #[serde(default)]
+    pub peak_market_cap: Option<f64>,
+    #[serde(default)]
+    pub mc_at_bond: Option<f64>,
+    #[serde(default)]
+    pub market_cap_at_alert: Option<f64>,
+    #[serde(default)]
+    pub mc_multiplier: Option<f64>,
     pub deployer_wallet: String,
     pub deployer_tier: DeployerTier,
-    pub peak_market_cap_usd: Option<f64>,
-    pub bonded_at: Option<String>,
+    #[serde(default)]
+    pub alerted_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BestTokensResponse {
     pub tokens: Vec<BestToken>,
     pub period: String,
+    pub limit: u32,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RecentBond {
-    pub mint: String,
-    pub name: Option<String>,
-    pub symbol: Option<String>,
-    pub deployer_wallet: String,
-    pub deployer_tier: DeployerTier,
+    pub id: String,
+    pub token_mint: String,
+    #[serde(default)]
+    pub token_name: Option<String>,
+    #[serde(default)]
+    pub token_symbol: Option<String>,
+    pub deployed_at: String,
     pub bonded_at: String,
-    pub peak_market_cap_usd: Option<f64>,
+    #[serde(default)]
+    pub time_to_bond_minutes: Option<f64>,
+    #[serde(default)]
+    pub peak_market_cap: Option<f64>,
+    #[serde(default)]
+    pub mc_at_bond: Option<f64>,
+    pub deployers: DeployerSummary,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RecentBondsResponse {
-    pub bonds: Vec<RecentBond>,
-    pub count: u32,
+    pub tokens: Vec<RecentBond>,
+    pub limit: u32,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1215,6 +1438,8 @@ pub struct AlphaLeaderboardResponse {
     pub sort: String,
     pub min_tokens: u32,
     pub exclude_bots: bool,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1369,6 +1594,8 @@ pub struct WatchlistResponse {
     pub count: u32,
     pub limit: u32,
     pub remaining: u32,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1456,23 +1683,31 @@ pub struct ToolsSearchParams {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Tool {
-    pub id: String,
     pub name: String,
     pub slug: String,
     pub tagline: String,
-    pub description: String,
     pub website_url: String,
+    #[serde(default)]
     pub logo_url: Option<String>,
     pub categories: Vec<String>,
+    #[serde(default)]
     pub pricing_model: Option<String>,
-    pub upvote_count: u32,
-    pub twitter_url: Option<String>,
+    #[serde(default)]
+    pub average_rating: Option<f64>,
+    #[serde(default)]
+    pub review_count: Option<u32>,
+    #[serde(default)]
+    pub health_score: Option<f64>,
+    #[serde(default)]
+    pub url: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ToolsSearchResponse {
     pub tools: Vec<Tool>,
     pub count: u32,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 // ─── Streaming ──────────────────────────────────────────────────────────────
@@ -1481,11 +1716,15 @@ pub struct ToolsSearchResponse {
 pub struct StreamToken {
     pub token: String,
     pub expires_at: String,
+    #[serde(default)]
+    pub next_refresh_at: Option<String>,
     pub ws_url: String,
     /// Only present for ULTRA-tier subscribers.
     #[serde(default)]
     pub dex_ws_url: Option<String>,
     pub usage: String,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 // ─── Webhooks ───────────────────────────────────────────────────────────────
@@ -1523,7 +1762,8 @@ pub struct Webhook {
 #[derive(Debug, Clone, Deserialize)]
 pub struct WebhookListResponse {
     pub webhooks: Vec<Webhook>,
-    pub count: u32,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
