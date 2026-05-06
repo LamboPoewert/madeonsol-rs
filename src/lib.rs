@@ -56,8 +56,9 @@ pub mod types;
 use std::sync::Arc;
 
 use crate::api::{
-    alpha::Alpha, coordination_alerts::CoordinationAlerts, deployer::Deployer, kol::Kol,
-    stream::Stream, tools::Tools, wallet_tracker::WalletTracker, webhooks::Webhooks,
+    alpha::Alpha, coordination_alerts::CoordinationAlerts, deployer::Deployer,
+    first_touch_subscriptions::FirstTouchSubscriptions, kol::Kol, stream::Stream, token::Token,
+    tools::Tools, wallet_tracker::WalletTracker, webhooks::Webhooks,
 };
 use crate::client::HttpCore;
 use crate::error::{MadeOnSolError, Result};
@@ -91,10 +92,14 @@ pub struct MadeOnSol {
     pub deployer: Deployer,
     /// Alpha wallet intelligence: leaderboard, profiles, cap tables, buyer quality.
     pub alpha: Alpha,
+    /// Token intelligence — comprehensive per-mint snapshot + batch lookups.
+    pub token: Token,
     /// Wallet tracker: watchlist CRUD, trades, summary.
     pub wallet_tracker: WalletTracker,
     /// Coordination alert rules CRUD (v1.1) — PRO/ULTRA.
     pub coordination_alerts: CoordinationAlerts,
+    /// First-touch webhook subscriptions CRUD — ULTRA only. Use `kol.first_touches()` for read-only queries.
+    pub first_touch_subscriptions: FirstTouchSubscriptions,
     /// Solana tool directory search.
     pub tools: Tools,
     /// WebSocket streaming token issuance.
@@ -132,8 +137,10 @@ impl MadeOnSol {
             kol: Kol { core: Arc::clone(&core) },
             deployer: Deployer { core: Arc::clone(&core) },
             alpha: Alpha { core: Arc::clone(&core) },
+            token: Token { core: Arc::clone(&core) },
             wallet_tracker: WalletTracker { core: Arc::clone(&core) },
             coordination_alerts: CoordinationAlerts { core: Arc::clone(&core) },
+            first_touch_subscriptions: FirstTouchSubscriptions { core: Arc::clone(&core) },
             tools: Tools { core: Arc::clone(&core) },
             stream: Stream { core: Arc::clone(&core) },
             webhooks: Webhooks { core },

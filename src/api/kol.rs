@@ -126,4 +126,18 @@ impl Kol {
         }
         self.core.get("/kol/alerts/recent", &query).await
     }
+
+    /// Recent first-KOL-touch events on tokens — every time a tracked KOL was the first
+    /// to buy a given mint. Filterable by scout tier (S/A/B/C from `mv_kol_scout_score`),
+    /// KOL winrate, token age, mint suffix, etc.
+    ///
+    /// Backtest: top scouts attract ≥3 follow-on KOLs within 4h ~50% of the time vs ~14% baseline.
+    /// Median lead time before second KOL is 12s — for trading this signal, use the
+    /// `kol:first_touches` WebSocket channel rather than polling.
+    pub async fn first_touches(
+        &self,
+        params: &FirstTouchesParams,
+    ) -> Result<FirstTouchesResponse> {
+        self.core.get("/kol/first-touches", params).await
+    }
 }

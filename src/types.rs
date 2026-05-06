@@ -250,6 +250,10 @@ impl CoordinationDeliveryMode {
 pub struct KolFeedParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
+    /// Cursor — return trades strictly older than this ISO 8601 timestamp.
+    /// Pass `next_before` from the previous response for polling.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub action: Option<KolAction>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -329,8 +333,17 @@ pub struct KolTrade {
     pub token_name: Option<String>,
     #[serde(default)]
     pub token_symbol: Option<String>,
+    #[serde(default)]
+    pub token_image_url: Option<String>,
     pub sol_amount: f64,
     pub token_amount: f64,
+    /// Token market cap in USD at the moment of trade (real-time, sourced
+    /// from our in-memory price tracker — not Dexscreener spot, which lags).
+    #[serde(default)]
+    pub market_cap_usd_at_trade: Option<f64>,
+    /// Token price in USD at the moment of trade.
+    #[serde(default)]
+    pub price_usd_at_trade: Option<f64>,
     pub traded_at: String,
     #[serde(default)]
     pub kol_strategy_tag: Option<String>,
@@ -362,6 +375,9 @@ pub struct KolFeedResponse {
     pub count: u32,
     #[serde(default)]
     pub data_age_seconds: Option<u64>,
+    /// Cursor for the next page — pass as `before` to fetch older trades.
+    #[serde(default)]
+    pub next_before: Option<String>,
     #[serde(default, rename = "_rid")]
     pub _rid: Option<String>,
 }
@@ -401,6 +417,14 @@ pub struct KolLeaderboardEntry {
     pub percentile_pnl_30d: Option<f64>,
     #[serde(default)]
     pub percentile_winrate_30d: Option<f64>,
+    /// v0.6 (2026-05-06) — average market cap (USD) at the moment of each buy in the period.
+    /// Null when no buys had a tracked MC stamp.
+    #[serde(default)]
+    pub avg_entry_mc_usd: Option<f64>,
+    /// v0.6 — buys whose `market_cap_usd_at_trade` was non-null and counted toward
+    /// `avg_entry_mc_usd`. Use to gauge confidence.
+    #[serde(default)]
+    pub entry_mc_samples: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -478,6 +502,15 @@ pub struct CoordinatedToken {
     pub holders_count: Option<u32>,
     #[serde(default)]
     pub coordination_score: Option<u32>,
+    /// v0.6 (2026-05-06) — market cap (USD) stamped on the cluster's chronologically-first KOL buy.
+    #[serde(default)]
+    pub market_cap_usd_at_first_buy: Option<f64>,
+    /// v0.6 — current market cap (USD), from `token_prices`.
+    #[serde(default)]
+    pub market_cap_usd: Option<f64>,
+    /// v0.6 — current last-trade price (USD).
+    #[serde(default)]
+    pub last_price_usd: Option<f64>,
     #[serde(default)]
     pub kols: Option<Vec<CoordinationKol>>,
 }
@@ -1011,6 +1044,212 @@ pub struct CoordinationAlertDeleteResponse {
     pub deleted: bool,
 }
 
+// ─── First-touch signal ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+pub enum ScoutTier {
+    #[serde(rename = "S")] S,
+    #[serde(rename = "A")] A,
+    #[serde(rename = "B")] B,
+    #[serde(rename = "C")] C,
+}
+
+impl ScoutTier {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ScoutTier::S => "S",
+            ScoutTier::A => "A",
+            ScoutTier::B => "B",
+            ScoutTier::C => "C",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum FirstTouchPreset {
+    Scout,
+    FreshLaunch,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct FirstTouchesParams {
+    /// ISO datetime — events strictly newer than this. Polling cursor.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub since: Option<String>,
+    /// ISO datetime — events strictly older than this. Pagination cursor.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
+    /// 1–100. Default: 50 (BASIC capped at 20).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    /// Single KOL wallet (32–44 base58 chars).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kol: Option<String>,
+    /// 0–100.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_kol_winrate_7d: Option<f64>,
+    /// Restrict to scouts of this tier or better. Requires `n_first_touches_30d >= 30`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_scout_tier: Option<ScoutTier>,
+    /// Lower the minimum sample size for scout scoring (default 30).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_n_touches: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strategy: Option<KolStrategy>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub token_age_max_min: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_first_buy_sol: Option<f64>,
+    /// Suffix-filter the token mint (e.g. "pump", "bonk").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mint_suffix: Option<String>,
+    /// Shortcut filter sets — `scout` = min_scout_tier=B + min_n_touches=30 + token_age_max_min=60.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preset: Option<FirstTouchPreset>,
+    /// Comma-separated includes — currently `followers_4h`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FirstTouchKol {
+    /// Wallet address — only present on Ultra tier.
+    #[serde(default)]
+    pub wallet: Option<String>,
+    pub name: Option<String>,
+    pub twitter_url: Option<String>,
+    pub winrate_7d: Option<f64>,
+    pub strategy: Option<String>,
+    pub scout_tier: Option<ScoutTier>,
+    /// Same as swarm_3plus_pct on the scout leaderboard.
+    pub scout_score: Option<f64>,
+    pub n_first_touches_30d: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FirstTouchEvent {
+    pub token_mint: String,
+    pub token_symbol: Option<String>,
+    pub token_name: Option<String>,
+    pub token_image_url: Option<String>,
+    pub first_buy_at: String,
+    pub sol_amount: Option<f64>,
+    pub token_amount: Option<f64>,
+    pub tx_signature: Option<String>,
+    pub token_age_minutes: Option<u32>,
+    pub first_kol: FirstTouchKol,
+    #[serde(default)]
+    pub followers_4h: Option<u32>,
+    /// v0.6 (2026-05-06) — market cap (USD) stamped on the exact tx that fired
+    /// the first KOL buy, joined via `tx_signature`.
+    #[serde(default)]
+    pub market_cap_usd_at_first_buy: Option<f64>,
+    /// v0.6 — token price (USD) at the same moment.
+    #[serde(default)]
+    pub price_usd_at_first_buy: Option<f64>,
+    /// v0.6 — current market cap (USD), from `token_prices`.
+    #[serde(default)]
+    pub market_cap_usd: Option<f64>,
+    /// v0.6 — current last-trade price (USD).
+    #[serde(default)]
+    pub last_price_usd: Option<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FirstTouchesResponse {
+    pub events: Vec<FirstTouchEvent>,
+    pub count: u32,
+    pub next_before: Option<String>,
+    pub data_age_seconds: Option<u32>,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FirstTouchSubscriptionFilters {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kol: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mint_suffix: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_first_buy_sol: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_scout_tier: Option<ScoutTier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_n_touches: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FirstTouchSubscription {
+    pub id: String,
+    pub name: Option<String>,
+    pub filters: FirstTouchSubscriptionFilters,
+    pub delivery_mode: CoordinationDeliveryMode,
+    pub webhook_url: Option<String>,
+    pub is_active: bool,
+    pub created_at: String,
+    #[serde(default)]
+    pub updated_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct FirstTouchSubscriptionCreateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filters: Option<FirstTouchSubscriptionFilters>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delivery_mode: Option<CoordinationDeliveryMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub webhook_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct FirstTouchSubscriptionUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filters: Option<FirstTouchSubscriptionFilters>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delivery_mode: Option<CoordinationDeliveryMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub webhook_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_active: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FirstTouchSubscriptionListResponse {
+    pub subscriptions: Vec<FirstTouchSubscription>,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FirstTouchSubscriptionCreateResponse {
+    pub subscription: FirstTouchSubscription,
+    /// One-time HMAC secret. Save it — will not be shown again.
+    pub webhook_secret: Option<String>,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FirstTouchSubscriptionGetResponse {
+    pub subscription: FirstTouchSubscription,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FirstTouchSubscriptionUpdateResponse {
+    pub subscription: FirstTouchSubscription,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FirstTouchSubscriptionDeleteResponse {
+    pub ok: bool,
+}
+
 // ─── Deployer Hunter ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -1037,6 +1276,10 @@ pub struct DeployerTokensParams {
 pub struct DeployerAlertsParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub since: Option<String>,
+    /// Cursor — return alerts strictly older than this ISO 8601 timestamp.
+    /// Pass `next_before` from previous response. Preferred over `offset` at scale.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1044,6 +1287,15 @@ pub struct DeployerAlertsParams {
     /// PRO/ULTRA only. BASIC subscribers receive HTTP 403.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tier: Option<DeployerTier>,
+    /// Filter by alert_type (e.g. "new_deploy", "bonded").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alert_type: Option<String>,
+    /// Filter by alert priority ("high" | "medium" | "low").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub priority: Option<String>,
+    /// Only alerts where at least N KOLs bought the token.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_kol_buys: Option<u32>,
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -1064,6 +1316,16 @@ pub struct BestTokensParams {
 pub struct RecentBondsParams {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub limit: Option<u32>,
+    /// ISO 8601 datetime — only bonds strictly newer than this timestamp.
+    /// Pass `next_since` from the previous response for incremental polling.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub since: Option<String>,
+    /// Filter by deployer reputation tier.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tier: Option<DeployerTier>,
+    /// Only bonds that reached at least this peak market cap (USD).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peak_mc_min: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1100,6 +1362,9 @@ pub struct DeployerSummary {
     pub recent_bond_rate: Option<f64>,
     #[serde(default)]
     pub total_tokens_deployed: Option<u32>,
+    /// Peak market cap (USD) of this deployer's best token to date. Populated on alert rows.
+    #[serde(default)]
+    pub best_token_peak_mc: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1206,6 +1471,9 @@ pub struct DeployerAlertsResponse {
     pub alerts: Vec<DeployerAlert>,
     pub limit: u32,
     pub offset: u32,
+    /// Cursor for the next page — pass as `before` to fetch older alerts.
+    #[serde(default)]
+    pub next_before: Option<String>,
     #[serde(default)]
     pub data_age_seconds: Option<u64>,
     #[serde(default, rename = "_rid")]
@@ -1292,6 +1560,8 @@ pub struct RecentBond {
     pub token_name: Option<String>,
     #[serde(default)]
     pub token_symbol: Option<String>,
+    #[serde(default)]
+    pub token_image_url: Option<String>,
     pub deployed_at: String,
     pub bonded_at: String,
     #[serde(default)]
@@ -1307,6 +1577,10 @@ pub struct RecentBond {
 pub struct RecentBondsResponse {
     pub tokens: Vec<RecentBond>,
     pub limit: u32,
+    /// Cursor for incremental polling — pass as `since` on the next call to
+    /// fetch only newer bonds.
+    #[serde(default)]
+    pub next_since: Option<String>,
     #[serde(default, rename = "_rid")]
     pub _rid: Option<String>,
 }
@@ -1428,6 +1702,12 @@ pub struct AlphaWalletEntry {
     pub active_hours: Option<f64>,
     #[serde(default)]
     pub bot_confidence: Option<String>,
+    /// v0.6 (2026-05-06) — avg market cap (USD) at the moment of each buy in the period.
+    /// Null + 0 samples for non-KOL wallets that don't appear in our trade-level dataset.
+    #[serde(default)]
+    pub avg_entry_mc_usd: Option<f64>,
+    #[serde(default)]
+    pub entry_mc_samples: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1556,6 +1836,104 @@ pub struct AlphaBuyerQualityResponse {
     pub breakdown: Option<AlphaBuyerQualityBreakdown>,
     #[serde(default)]
     pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AlphaBuyerQualityBatchResponse {
+    pub tokens: Vec<AlphaBuyerQualityResponse>,
+    pub count: u32,
+    /// Number of mints served from the shared 5-min LRU cache without a DB query.
+    pub cache_hits: u32,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
+// ─── Token intelligence (/token/{mint}) ─────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TokenKolTopBuyer {
+    pub name: String,
+    pub sol_amount: f64,
+    /// ULTRA only — individual KOL wallet address.
+    #[serde(default)]
+    pub wallet: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TokenKolActivity {
+    pub buying_kols: u32,
+    pub selling_kols: u32,
+    pub net_flow_sol: f64,
+    /// "accumulating" | "distributing" | "neutral".
+    pub signal: String,
+    pub top_buyers: Vec<TokenKolTopBuyer>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TokenDeployerInfo {
+    pub wallet: String,
+    pub tier: DeployerTier,
+    #[serde(default)]
+    pub bonding_rate: Option<f64>,
+    #[serde(default)]
+    pub total_deployed: Option<u32>,
+    #[serde(default)]
+    pub total_bonded: Option<u32>,
+    #[serde(default)]
+    pub recent_bond_rate: Option<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TokenResponseBody {
+    pub mint: String,
+    #[serde(default)]
+    pub price_usd: Option<f64>,
+    #[serde(default)]
+    pub price_sol: Option<f64>,
+    #[serde(default)]
+    pub market_cap: Option<f64>,
+    #[serde(default)]
+    pub volume_24h_usd: Option<f64>,
+    #[serde(default)]
+    pub volume_24h_sol: Option<f64>,
+    #[serde(default)]
+    pub trades_24h: Option<u32>,
+    #[serde(default)]
+    pub last_trade_at: Option<String>,
+    /// When the mint first appeared in our indexer.
+    #[serde(default)]
+    pub first_seen_at: Option<String>,
+    #[serde(default)]
+    pub age_seconds: Option<u64>,
+    #[serde(default)]
+    pub is_blacklisted: Option<bool>,
+    /// "stablecoin" | "wrapped_sol" | "lst" | "rug" | custom category when blacklisted.
+    #[serde(default)]
+    pub blacklist_category: Option<String>,
+    #[serde(default)]
+    pub deployer: Option<TokenDeployerInfo>,
+    pub kol_activity: TokenKolActivity,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TokenResponse {
+    pub token: TokenResponseBody,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct TokenBatchResponse {
+    pub tokens: Vec<TokenResponseBody>,
+    pub count: u32,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MintBatchRequest {
+    /// 1–50 base58 Solana token mint addresses.
+    pub mints: Vec<String>,
 }
 
 // ─── Wallet Tracker ─────────────────────────────────────────────────────────

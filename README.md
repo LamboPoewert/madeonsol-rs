@@ -13,6 +13,13 @@ async, `tokio`-based, `rustls`-only.
 >
 > **Free tier: 200 requests/day at <https://madeonsol.com/developer> — no credit card required.**
 
+> **New in 0.6.0** *(2026-05-06)* — Market cap fields flow through every signal endpoint.
+> `KolLeaderboardEntry` and `AlphaWalletEntry` gain `avg_entry_mc_usd` + `entry_mc_samples`
+> (micro-cap vs mid-cap trader profile). `CoordinatedToken` gains
+> `market_cap_usd_at_first_buy` + current `market_cap_usd` + `last_price_usd`.
+> `FirstTouchEvent` gains `market_cap_usd_at_first_buy` + `price_usd_at_first_buy` +
+> current MC. All additive — no breaking changes.
+
 ## Get an API key
 
 1. Visit **<https://madeonsol.com/developer>**
@@ -57,8 +64,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }).await?;
 
     for trade in feed.trades {
-        println!("{:?} bought {:?} for {} SOL",
-                 trade.kol_name, trade.token_symbol, trade.sol_amount);
+        let mc = trade.market_cap_usd_at_trade
+            .map(|m| format!(" @ MC ${:.0}", m))
+            .unwrap_or_default();
+        println!("{:?} bought {:?} for {} SOL{}",
+                 trade.kol_name, trade.token_symbol, trade.sol_amount, mc);
     }
     Ok(())
 }
@@ -74,15 +84,16 @@ cargo run --example deployer_alerts
 
 ## Namespaces
 
-The `MadeOnSol` client exposes eight namespaced sub-clients:
+The `MadeOnSol` client exposes namespaced sub-clients:
 
 | Namespace | Purpose |
 |---|---|
-| `client.kol` | KOL feed, leaderboard, coordination, PnL, trending tokens, alerts, compare |
+| `client.kol` | KOL feed, leaderboard, coordination, PnL, trending tokens, alerts, compare, **first_touches** |
 | `client.deployer` | Pump.fun deployer leaderboard, alerts, trajectory, bonded tokens |
 | `client.alpha` | Alpha-wallet leaderboard, profiles, cap tables, buyer quality |
 | `client.wallet_tracker` | Track arbitrary Solana wallets — watchlist CRUD, swap/transfer history |
 | `client.coordination_alerts` | Push alerts on coordinated buying (PRO/ULTRA) |
+| `client.first_touch_subscriptions` | Push alerts on first-KOL-touch events (ULTRA) |
 | `client.tools` | Solana tool directory search |
 | `client.stream` | Issue 24h WebSocket streaming tokens |
 | `client.webhooks` | Webhook CRUD (PRO/ULTRA) |
@@ -95,6 +106,7 @@ Full reference: <https://docs.rs/madeonsol> · Interactive API docs: <https://ma
 - **DEX trade sniping** — subscribe to the all-DEX stream filtered by token / wallet
 - **Deployer sniper** — monitor `client.deployer.alerts()` for elite-tier launches
 - **Coordination detector** — flag tokens with `client.kol.coordination()` or push alerts
+- **Scout signal** — track first-KOL-touch events filtered to S/A-tier scouts via `client.kol.first_touches()` (backtested: ~50% swarm rate vs 14% baseline)
 - **Analytics dashboard** — combine leaderboard, PnL, and tool data
 - **Telegram/Discord bot** — pipe alerts via webhooks into chat
 - **Portfolio tracker** — use `client.kol.wallet()` to follow specific KOL positions
@@ -122,6 +134,58 @@ match client.kol.token("invalid-mint").await {
 `Error::MissingApiKey` is returned by `MadeOnSol::new` if the key is empty or
 doesn't start with `msk_` — the error message and a stderr hint both link to
 <https://madeonsol.com/developer>.
+
+## First-touch signal *(new in 0.4)*
+
+Every "first KOL buy on a token mint" event — when a tracked KOL is the first of the cohort to touch a token. Filterable by **scout tier** (S/A/B/C from `mv_kol_scout_score`), KOL winrate, token age, mint suffix.
+
+**Backtest:** S-tier scouts attract ≥3 follow-on KOLs within 4h ~50% of the time vs ~14% baseline (38d / 491k buys / 72,549 events). Public leaderboard at <https://madeonsol.com/kol/scouts>.
+
+```rust
+use madeonsol::{FirstTouchPreset, FirstTouchesParams, ScoutTier};
+
+let res = client
+    .kol
+    .first_touches(&FirstTouchesParams {
+        preset: Some(FirstTouchPreset::Scout),
+        min_scout_tier: Some(ScoutTier::S),
+        limit: Some(20),
+        ..Default::default()
+    })
+    .await?;
+
+for e in res.events {
+    println!(
+        "{} scouted {} (scout_score={:?}%)",
+        e.first_kol.name.unwrap_or_default(),
+        e.token_symbol.unwrap_or_default(),
+        e.first_kol.scout_score
+    );
+}
+```
+
+**Webhook subscriptions** (Ultra, up to 10 active per user) — push delivery, HMAC-SHA256 signed:
+
+```rust
+use madeonsol::{FirstTouchSubscriptionCreateParams, FirstTouchSubscriptionFilters, ScoutTier, CoordinationDeliveryMode};
+
+let res = client
+    .first_touch_subscriptions
+    .create(&FirstTouchSubscriptionCreateParams {
+        name: Some("S-tier scouts on pump tokens".into()),
+        filters: Some(FirstTouchSubscriptionFilters {
+            min_scout_tier: Some(ScoutTier::S),
+            mint_suffix: Some("pump".into()),
+            ..Default::default()
+        }),
+        delivery_mode: Some(CoordinationDeliveryMode::Webhook),
+        webhook_url: Some("https://you.com/hooks/scout".into()),
+    })
+    .await?;
+// store res.webhook_secret — shown ONCE
+```
+
+> **Don't poll — push.** Median lead time before the second KOL is 12 seconds. WebSocket channel: `kol:first_touches` (PRO+).
 
 ## WebSocket streams (PRO/ULTRA)
 
