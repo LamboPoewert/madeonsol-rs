@@ -17,14 +17,8 @@ async, `tokio`-based, `rustls`-only.
 >
 > **Free tier: 200 requests/day at <https://madeonsol.com/pricing> — no credit card required.**
 
-> **New in 0.8.0** *(2026-05-12)* — **Token directory + account inspection.**
-> `client.token.list(&TokensListParams { min_liq: Some(10_000.0), min_volume_1h_usd: Some(5_000.0), max_mev_share_pct: Some(60.0), mc_change_1h_min_pct: Some(20.0), sort: Some("mc_desc".into()), ..Default::default() })` filters every active mint by MC band, liquidity floor, primary DEX,
-> authority/safety flags, computed 1h volume, MEV-share ceiling, and MC-change deltas. Default `min_liq=2000` skips phantom-MC dust;
-> pass `Some(0.0)` to opt out. `client.me.get()` — read your tier, daily/burst
-> quota state, and per-feature usage in one call (no header parsing). Velocity / MEV-share fields added
-> to every `TokenResponseBody`: `velocity["5m"|"15m"|"1h"|"2h"|"4h"]` with
-> `mc_change_pct`, `volume_usd`, `mev_volume_pct`. `/token/{mint}` 400s now ship
-> structured `code`, `reason`, `received_length`, `example`, and `docs`. Deprecated `avg_entry_mc_usd` / `entry_mc_samples` fully removed.
+> **New in 0.10.0** *(2026-05-25)* — **Price alerts, scout leaderboard, KOL consensus, peak history, coordination history, wallet derived stats, trajectory snapshots.**
+> `client.price_alerts` — full CRUD for MC-drop / recovery alert rules (PRO/ULTRA). `client.kol.scout_leaderboard()` — ranked scouts by swarm attraction rate. `client.token.kol_consensus(mint)` — per-token KOL buyer/seller breakdown. `client.token.peak_history(mint)` — ATH, decline from peak, MC snapshots post-bond. `client.kol.coordination_history()` — past coordination fires. `client.deployer.trajectory(wallet, params)` now accepts `include: Some("daily_snapshots")` for 90d snapshots. `WalletStatsResponse.derived` — win rate, ROI, best/worst trade, biggest miss, AI verdict.
 
 ## Get an API key
 
@@ -47,7 +41,7 @@ Annual: PRO $490/yr, ULTRA $1,490/yr (2 months free).
 
 ```toml
 [dependencies]
-madeonsol = "0.1"
+madeonsol = "0.10"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -94,13 +88,15 @@ The `MadeOnSol` client exposes namespaced sub-clients:
 
 | Namespace | Purpose |
 |---|---|
-| `client.kol` | KOL feed, leaderboard, coordination, PnL, trending tokens, alerts, compare, **first_touches** |
-| `client.deployer` | Pump.fun deployer leaderboard, alerts, trajectory, bonded tokens |
+| `client.kol` | KOL feed, leaderboard, coordination, PnL, trending tokens, alerts, compare, **first_touches**, **scout_leaderboard**, **coordination_history** |
+| `client.deployer` | Pump.fun deployer leaderboard, alerts, trajectory (+ daily snapshots), bonded tokens |
 | `client.alpha` | Alpha-wallet leaderboard, profiles, cap tables, buyer quality |
+| `client.token` | Per-mint snapshot, batch lookup, buyer quality, **kol_consensus**, **peak_history**, directory list |
 | `client.wallet_tracker` | Track arbitrary Solana wallets — watchlist CRUD, swap/transfer history |
-| `client.wallet` *(new 0.9)* | Universal wallet endpoints — stats + cross-product flags, FIFO PnL, open positions, paginated trades (PRO+) |
+| `client.wallet` | Universal wallet endpoints — stats + cross-product flags + derived analytics, FIFO PnL, open positions, paginated trades (PRO+) |
 | `client.coordination_alerts` | Push alerts on coordinated buying (PRO/ULTRA) |
 | `client.first_touch_subscriptions` | Push alerts on first-KOL-touch events (ULTRA) |
+| `client.price_alerts` *(new 0.10)* | MC-drop / recovery price alert rules CRUD + event history (PRO/ULTRA) |
 | `client.tools` | Solana tool directory search |
 | `client.stream` | Issue 24h WebSocket streaming tokens |
 | `client.webhooks` | Webhook CRUD (PRO/ULTRA) |
@@ -235,6 +231,70 @@ loop {
 ```
 
 **Cost-basis honesty.** Observable only inside the 90-day window. Overflow sells (no matching buy in window) are silently discarded rather than fabricated. `notes.cost_basis_observable_from` makes the cutoff visible.
+
+## Price alerts *(new in 0.10)*
+
+Get notified when a token's market cap drops below a threshold (and optionally on recovery). PRO: 5 rules, ULTRA: 20 rules. Delivered via WebSocket channel `price:alerts` and/or HMAC-signed webhook.
+
+```rust
+# async fn run(client: madeonsol::MadeOnSol) -> Result<(), Box<dyn std::error::Error>> {
+use madeonsol::types::{PriceAlertCreateParams, PriceAlertDeliveryMode, PriceAlertEventsParams};
+
+// Create an alert: fire when MC drops 30%, then again on 50% recovery.
+let res = client.price_alerts.create(&PriceAlertCreateParams {
+    token_mint: "So11111111111111111111111111111111111111112".into(),
+    drop_pct: 30.0,
+    recovery_pct: Some(50.0),
+    name: Some("SOL 30% dip".into()),
+    delivery_mode: Some(PriceAlertDeliveryMode::Webhook),
+    webhook_url: Some("https://you.com/hooks/price".into()),
+}).await?;
+// store res.webhook_secret — shown ONCE
+println!("Alert {} created, status: {:?}", res.alert.id, res.alert.status);
+
+// List active alerts
+let alerts = client.price_alerts.list().await?;
+for a in alerts.alerts {
+    println!("{}: {} drop={}% status={:?}", a.id, a.token_mint, a.drop_pct, a.status);
+}
+
+// Check fired events
+let events = client.price_alerts.events(&PriceAlertEventsParams {
+    limit: Some(20),
+    ..Default::default()
+}).await?;
+for e in events.events {
+    println!("{} {} at MC ${:.0}", e.event_type, e.token_mint, e.current_mc_usd);
+}
+# Ok(())
+# }
+```
+
+## New in 0.10: scout leaderboard, KOL consensus, peak history
+
+```rust
+# async fn run(client: madeonsol::MadeOnSol) -> Result<(), Box<dyn std::error::Error>> {
+use madeonsol::types::{ScoutLeaderboardParams, ScoutTier, ScoutLeaderboardSort};
+
+// Top scouts by swarm attraction rate
+let scouts = client.kol.scout_leaderboard(&ScoutLeaderboardParams {
+    limit: Some(10),
+    scout_tier: Some(ScoutTier::S),
+    sort: Some(ScoutLeaderboardSort::Swarm3PlusPct),
+}).await?;
+println!("{}", scouts);
+
+// KOL consensus on a token
+let consensus = client.token.kol_consensus("So11111111111111111111111111111111111111112").await?;
+println!("{} buyers, {} sellers, exit rate {:?}%",
+    consensus.total_kol_buyers, consensus.total_kol_sellers, consensus.kol_exit_rate);
+
+// Peak MC history
+let peak = client.token.peak_history("So11111111111111111111111111111111111111112").await?;
+println!("ATH: {:?}, decline: {:?}%", peak.peak_mc_usd, peak.decline_from_peak_pct);
+# Ok(())
+# }
+```
 
 ## WebSocket streams (PRO/ULTRA)
 

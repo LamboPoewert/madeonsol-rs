@@ -34,12 +34,13 @@
 //!
 //! ## Namespaces
 //!
-//! - [`MadeOnSol::kol`] — KOL feed, leaderboard, coordination, PnL, trending tokens, alerts
+//! - [`MadeOnSol::kol`] — KOL feed, leaderboard, coordination, PnL, trending tokens, alerts, scout leaderboard
 //! - [`MadeOnSol::deployer`] — Pump.fun deployer leaderboard, alerts, trajectory
 //! - [`MadeOnSol::alpha`] — alpha-wallet leaderboard, profiles, cap tables, buyer quality
 //! - [`MadeOnSol::wallet_tracker`] — track arbitrary Solana wallets (watchlist)
 //! - [`MadeOnSol::wallet`] — universal wallet stats, FIFO PnL, open positions, paginated trades (PRO+)
 //! - [`MadeOnSol::coordination_alerts`] — push alerts on coordinated buying (PRO/ULTRA)
+//! - [`MadeOnSol::price_alerts`] — price-drop / recovery alert rules CRUD (PRO/ULTRA)
 //! - [`MadeOnSol::tools`] — Solana tool directory search
 //! - [`MadeOnSol::stream`] — WebSocket streaming token issuance
 //! - [`MadeOnSol::webhooks`] — webhook CRUD (PRO/ULTRA)
@@ -58,8 +59,9 @@ use std::sync::Arc;
 
 use crate::api::{
     alpha::Alpha, coordination_alerts::CoordinationAlerts, deployer::Deployer,
-    first_touch_subscriptions::FirstTouchSubscriptions, kol::Kol, me::Me, stream::Stream, token::Token,
-    tools::Tools, wallet::Wallet, wallet_tracker::WalletTracker, webhooks::Webhooks,
+    first_touch_subscriptions::FirstTouchSubscriptions, kol::Kol, me::Me,
+    price_alerts::PriceAlerts, stream::Stream, token::Token, tools::Tools,
+    wallet::Wallet, wallet_tracker::WalletTracker, webhooks::Webhooks,
 };
 use crate::client::HttpCore;
 use crate::error::{MadeOnSolError, Result};
@@ -81,7 +83,7 @@ pub use crate::error::MadeOnSolError as Error;
 /// # async fn run() -> Result<(), Box<dyn std::error::Error>> {
 /// let client = MadeOnSol::new(std::env::var("MADEONSOL_API_KEY")?)?;
 /// let stats = client.deployer.stats().await?;
-/// println!("{} elite deployers tracked", stats.elite_count);
+/// println!("{} deployers tracked", stats.tracked_count);
 /// # Ok(())
 /// # }
 /// ```
@@ -105,6 +107,8 @@ pub struct MadeOnSol {
     pub coordination_alerts: CoordinationAlerts,
     /// First-touch webhook subscriptions CRUD — ULTRA only. Use `kol.first_touches()` for read-only queries.
     pub first_touch_subscriptions: FirstTouchSubscriptions,
+    /// Price-drop / recovery alert rules CRUD (v1.9) — PRO/ULTRA.
+    pub price_alerts: PriceAlerts,
     /// Solana tool directory search.
     pub tools: Tools,
     /// WebSocket streaming token issuance.
@@ -148,6 +152,7 @@ impl MadeOnSol {
             wallet: Wallet { core: Arc::clone(&core) },
             coordination_alerts: CoordinationAlerts { core: Arc::clone(&core) },
             first_touch_subscriptions: FirstTouchSubscriptions { core: Arc::clone(&core) },
+            price_alerts: PriceAlerts { core: Arc::clone(&core) },
             tools: Tools { core: Arc::clone(&core) },
             stream: Stream { core: Arc::clone(&core) },
             webhooks: Webhooks { core },

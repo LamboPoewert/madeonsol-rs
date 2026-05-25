@@ -88,11 +88,18 @@ impl Deployer {
 
     /// Deployer skill curve — streaks, rolling bond rate, improvement trend.
     /// PRO/ULTRA only.
-    pub async fn trajectory(&self, wallet: &str) -> Result<DeployerTrajectoryResponse> {
+    ///
+    /// Pass `include: Some("daily_snapshots")` for up to 90 daily tier/bonding
+    /// snapshots in the response.
+    pub async fn trajectory(
+        &self,
+        wallet: &str,
+        params: &DeployerTrajectoryParams,
+    ) -> Result<DeployerTrajectoryResponse> {
         self.core
             .get(
                 &format!("/deployer-hunter/{}/trajectory", wallet),
-                &(),
+                params,
             )
             .await
     }

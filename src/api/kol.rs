@@ -127,6 +127,24 @@ impl Kol {
         self.core.get("/kol/alerts/recent", &query).await
     }
 
+    /// v1.9 — Scout leaderboard: top KOLs ranked by scout score, first-touch frequency,
+    /// and swarm attraction rate. ULTRA only.
+    pub async fn scout_leaderboard(
+        &self,
+        params: &ScoutLeaderboardParams,
+    ) -> Result<serde_json::Value> {
+        self.core.get("/kol/scouts/leaderboard", params).await
+    }
+
+    /// v1.9 — Coordination history: past coordination alert fires with token, score,
+    /// KOL count. ULTRA only.
+    pub async fn coordination_history(
+        &self,
+        params: &CoordinationHistoryParams,
+    ) -> Result<serde_json::Value> {
+        self.core.get("/kol/coordination/history", params).await
+    }
+
     /// Recent first-KOL-touch events on tokens — every time a tracked KOL was the first
     /// to buy a given mint. Filterable by scout tier (S/A/B/C from `mv_kol_scout_score`),
     /// KOL winrate, token age, mint suffix, etc.

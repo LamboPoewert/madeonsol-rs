@@ -951,6 +951,113 @@ pub struct KolAlertsResponse {
     pub _rid: Option<String>,
 }
 
+// ─── Scout leaderboard (v1.9) ───────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ScoutLeaderboardSort {
+    Swarm3PlusPct,
+    NFirstTouches30d,
+    Swarm5PlusPct,
+    ScoutScore,
+}
+
+impl ScoutLeaderboardSort {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Swarm3PlusPct => "swarm_3plus_pct",
+            Self::NFirstTouches30d => "n_first_touches_30d",
+            Self::Swarm5PlusPct => "swarm_5plus_pct",
+            Self::ScoutScore => "scout_score",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct ScoutLeaderboardParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scout_tier: Option<ScoutTier>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort: Option<ScoutLeaderboardSort>,
+}
+
+// ─── Coordination history (v1.9) ────────────────────────────────────────────
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct CoordinationHistoryParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub since: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_score: Option<u32>,
+}
+
+// ─── KOL consensus (v1.9) ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct KolConsensusResponse {
+    pub total_kol_buyers: u32,
+    pub total_kol_sellers: u32,
+    #[serde(default)]
+    pub kol_exit_rate: Option<f64>,
+    pub net_flow_sol: f64,
+    pub total_buy_sol: f64,
+    pub total_sell_sol: f64,
+    #[serde(default)]
+    pub first_kol_buy_at: Option<String>,
+    #[serde(default)]
+    pub last_kol_buy_at: Option<String>,
+    #[serde(default)]
+    pub first_touch_wallet: Option<String>,
+    #[serde(default)]
+    pub first_touch_at: Option<String>,
+    #[serde(default)]
+    pub median_entry_mc_usd: Option<f64>,
+    /// ULTRA only — individual buyer wallet addresses.
+    #[serde(default)]
+    pub buyers: Option<Vec<String>>,
+    /// ULTRA only — wallets that have fully exited.
+    #[serde(default)]
+    pub exited: Option<Vec<String>>,
+}
+
+// ─── Peak history (v1.9) ───────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PeakHistoryResponse {
+    #[serde(default)]
+    pub peak_mc_usd: Option<f64>,
+    #[serde(default)]
+    pub peak_mc_updated_at: Option<String>,
+    #[serde(default)]
+    pub current_mc_usd: Option<f64>,
+    #[serde(default)]
+    pub current_price_usd: Option<f64>,
+    #[serde(default)]
+    pub decline_from_peak_pct: Option<f64>,
+    #[serde(default)]
+    pub mc_at_bond: Option<f64>,
+    #[serde(default)]
+    pub mc_1h_after_bond: Option<f64>,
+    #[serde(default)]
+    pub mc_6h_after_bond: Option<f64>,
+    #[serde(default)]
+    pub mc_24h_after_bond: Option<f64>,
+    #[serde(default)]
+    pub mc_7d_after_bond: Option<f64>,
+    #[serde(default)]
+    pub still_alive_1h: Option<bool>,
+    #[serde(default)]
+    pub time_to_bond_minutes: Option<f64>,
+    #[serde(default)]
+    pub deployed_at: Option<String>,
+    #[serde(default)]
+    pub bonded_at: Option<String>,
+}
+
 // ─── Coordination alerts (v1.1) ─────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1669,10 +1776,34 @@ pub struct DeployerTrajectoryDeployer {
     pub tier: String,
 }
 
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct DeployerTrajectoryParams {
+    /// Pass `"daily_snapshots"` for up to 90 daily tier/bonding snapshots.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DeployerDailySnapshot {
+    pub snapshot_date: String,
+    pub tier: String,
+    pub total_tokens_deployed: u32,
+    pub total_bonded: u32,
+    pub bonding_rate: f64,
+    pub recent_bond_rate: f64,
+    #[serde(default)]
+    pub avg_peak_mc: Option<f64>,
+    #[serde(default)]
+    pub best_token_peak_mc: Option<f64>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct DeployerTrajectoryResponse {
     pub deployer: DeployerTrajectoryDeployer,
     pub trajectory: DeployerTrajectoryData,
+    /// Present when `include=daily_snapshots` is requested.
+    #[serde(default)]
+    pub daily_snapshots: Option<Vec<DeployerDailySnapshot>>,
 }
 
 // ─── Alpha Wallet Intelligence ──────────────────────────────────────────────
@@ -2175,6 +2306,65 @@ pub struct WalletRecentTrade {
     pub tx_signature: String,
 }
 
+// ─── Wallet derived stats (v1.9) ────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WalletStandoutTrade {
+    pub token_mint: String,
+    #[serde(default)]
+    pub token_symbol: Option<String>,
+    pub pnl_sol: f64,
+    pub sol_in: f64,
+    pub sol_out: f64,
+    pub roi_pct: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WalletBiggestMiss {
+    pub token_mint: String,
+    #[serde(default)]
+    pub token_symbol: Option<String>,
+    pub actual_sol_out: f64,
+    pub potential_sol_at_ath: f64,
+    pub missed_sol: f64,
+    pub ath_mc_usd: f64,
+    #[serde(default)]
+    pub sold_at_mc_usd: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum WalletVerdictTone {
+    Green,
+    Red,
+    Amber,
+    Muted,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WalletVerdict {
+    pub label: String,
+    pub description: String,
+    pub tone: WalletVerdictTone,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct WalletDerivedStats {
+    #[serde(default)]
+    pub win_rate: Option<f64>,
+    #[serde(default)]
+    pub roi_pct: Option<f64>,
+    pub total_realized_pnl_sol: f64,
+    #[serde(default)]
+    pub best_trade: Option<WalletStandoutTrade>,
+    #[serde(default)]
+    pub worst_trade: Option<WalletStandoutTrade>,
+    #[serde(default)]
+    pub biggest_miss: Option<WalletBiggestMiss>,
+    #[serde(default)]
+    pub verdict: Option<WalletVerdict>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct WalletStatsResponse {
     pub address: String,
@@ -2194,6 +2384,9 @@ pub struct WalletStatsResponse {
     /// Last 10 raw trades with symbols joined (v1.8.1+).
     #[serde(default)]
     pub recent_trades: Vec<WalletRecentTrade>,
+    /// Derived analytics: win rate, ROI, best/worst trade, biggest miss, verdict (v1.9+).
+    #[serde(default)]
+    pub derived: Option<WalletDerivedStats>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2624,6 +2817,175 @@ pub struct TokensListResponse {
     pub tokens: Vec<TokenSummary>,
     pub pagination: TokensListPagination,
     pub filters: serde_json::Value,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
+// ─── Price alerts (v1.9) ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PriceAlertDeliveryMode {
+    Webhook,
+    Websocket,
+    Both,
+}
+
+impl PriceAlertDeliveryMode {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Webhook => "webhook",
+            Self::Websocket => "websocket",
+            Self::Both => "both",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PriceAlertStatus {
+    Watching,
+    Dipped,
+    Recovered,
+    Expired,
+}
+
+impl PriceAlertStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Watching => "watching",
+            Self::Dipped => "dipped",
+            Self::Recovered => "recovered",
+            Self::Expired => "expired",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PriceAlertCreateParams {
+    /// Solana mint address.
+    pub token_mint: String,
+    /// Drop % threshold (0.01–99.99). Alert fires when MC drops below baseline x (1 - drop_pct/100).
+    pub drop_pct: f64,
+    /// Recovery % threshold (0.01–1000). After dip fires, alert fires again when MC rises
+    /// above dip_low x (1 + recovery_pct/100). Optional.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recovery_pct: Option<f64>,
+    /// Optional label.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Default: "webhook".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delivery_mode: Option<PriceAlertDeliveryMode>,
+    /// Required when delivery_mode is "webhook" or "both". Must be HTTPS.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub webhook_url: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct PriceAlertUpdateParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub delivery_mode: Option<PriceAlertDeliveryMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub webhook_url: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_active: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PriceAlert {
+    pub id: i64,
+    #[serde(default)]
+    pub name: Option<String>,
+    pub token_mint: String,
+    #[serde(default)]
+    pub token_symbol: Option<String>,
+    pub baseline_mc_usd: f64,
+    pub drop_pct: f64,
+    #[serde(default)]
+    pub recovery_pct: Option<f64>,
+    pub status: PriceAlertStatus,
+    #[serde(default)]
+    pub dip_low_mc_usd: Option<f64>,
+    #[serde(default)]
+    pub dip_fired_at: Option<String>,
+    pub delivery_mode: PriceAlertDeliveryMode,
+    #[serde(default)]
+    pub webhook_url: Option<String>,
+    pub is_active: bool,
+    pub expires_at: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PriceAlertListResponse {
+    pub alerts: Vec<PriceAlert>,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PriceAlertCreateResponse {
+    pub alert: PriceAlert,
+    /// One-time HMAC secret. Save it — will not be shown again.
+    #[serde(default)]
+    pub webhook_secret: Option<String>,
+    #[serde(default)]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PriceAlertGetResponse {
+    pub alert: PriceAlert,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PriceAlertUpdateResponse {
+    pub alert: PriceAlert,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PriceAlertDeleteResponse {
+    pub deleted: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PriceAlertEvent {
+    pub id: i64,
+    pub alert_id: i64,
+    /// "dip" or "recovery".
+    pub event_type: String,
+    pub fired_at: String,
+    pub token_mint: String,
+    pub baseline_mc_usd: f64,
+    pub current_mc_usd: f64,
+    #[serde(default)]
+    pub drop_pct_actual: Option<f64>,
+    #[serde(default)]
+    pub dip_low_mc_usd: Option<f64>,
+    #[serde(default)]
+    pub recovery_pct_actual: Option<f64>,
+    pub delivered: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct PriceAlertEventsParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alert_id: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub event_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub since: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PriceAlertEventsResponse {
+    pub events: Vec<PriceAlertEvent>,
     #[serde(default, rename = "_rid")]
     pub _rid: Option<String>,
 }

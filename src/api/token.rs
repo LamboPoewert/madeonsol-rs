@@ -41,6 +41,22 @@ impl Token {
             .await
     }
 
+    /// v1.9 — KOL consensus on a token: how many KOLs bought/sold, exit rate,
+    /// net flow, median entry MC. ULTRA gets individual wallet arrays.
+    pub async fn kol_consensus(&self, mint: &str) -> Result<KolConsensusResponse> {
+        self.core
+            .get(&format!("/tokens/{}/kol-consensus", mint), &())
+            .await
+    }
+
+    /// v1.9 — Peak MC history for a token: ATH, decline from peak, MC at bond
+    /// and at 1h/6h/24h/7d after bond.
+    pub async fn peak_history(&self, mint: &str) -> Result<PeakHistoryResponse> {
+        self.core
+            .get(&format!("/tokens/{}/peak-history", mint), &())
+            .await
+    }
+
     /// v0.8 — Filtered, sortable token directory (PRO+). Default `min_liq=2000`
     /// trims the long tail of phantom-MC tokens (low-liq pools producing absurd
     /// VWAP × supply products); set `Some(0.0)` to opt out. Computed filters
