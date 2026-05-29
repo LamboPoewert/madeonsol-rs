@@ -2212,6 +2212,106 @@ pub struct WalletTrackerDeleteResponse {
     pub success: bool,
 }
 
+// ─── Sniper: deshred pre-confirm pump.fun deploy feed (PRO + ULTRA) ─────────
+
+/// A pump.fun deploy detected via shred-level ("deshred") reconstruction,
+/// ~500ms before the chain confirms it. Detection is pre-execution, so
+/// `confirmed_on_chain` is `None` until reconciled.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SniperDeploy {
+    pub mint: String,
+    pub name: Option<String>,
+    pub symbol: Option<String>,
+    pub deployer_wallet: String,
+    pub signature: String,
+    pub slot: i64,
+    pub detected_at: String,
+    pub detection_region: String,
+    pub deployer_tier: Option<String>,
+    pub deployer_bond_rate: Option<f64>,
+    pub deployer_total_bonded: Option<i64>,
+    pub deployer_recent: Option<String>,
+    pub confirmed_on_chain: Option<bool>,
+    pub confirmed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SniperRecentParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub since: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deployer_tier: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_bond_rate: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    /// ULTRA: narrow to your custom deployer watchlist (any tier).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub watchlist: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SniperRecentResponse {
+    pub deploys: Vec<SniperDeploy>,
+    pub count: u32,
+    pub data_age_seconds: Option<i64>,
+    #[serde(default)]
+    pub watchlist_empty: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SniperByDeployerResponse {
+    pub deployer: String,
+    pub deploys: Vec<SniperDeploy>,
+    pub count: u32,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SniperByDeployerParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SniperWatchlistEntry {
+    pub deployer_wallet: String,
+    pub label: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SniperWatchlistResponse {
+    pub deployers: Vec<SniperWatchlistEntry>,
+    pub count: u32,
+    pub limit: u32,
+    pub remaining: u32,
+}
+
+/// Add one (`wallet`) or many (`wallets`, max 50) deployers, with an optional label.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct SniperWatchlistAddParams {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wallet: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub wallets: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SniperWatchlistAddResponse {
+    pub added: u32,
+    #[serde(default)]
+    pub deployers: Vec<String>,
+    #[serde(default)]
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SniperWatchlistRemoveResponse {
+    pub removed: String,
+}
+
 // ─── Universal wallet (PRO+) ────────────────────────────────────────────────
 // New 2026-05-20. Works on any Solana wallet — not just curated KOLs. Backed
 // by FIFO cost-basis math over the last 90 days of token_trades. Cached in

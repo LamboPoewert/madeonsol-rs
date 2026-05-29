@@ -13,8 +13,12 @@ pub(crate) struct HttpCore {
 
 impl HttpCore {
     pub(crate) fn new(api_key: String) -> Self {
+        let client = reqwest::Client::builder()
+            .user_agent("madeonsol-rs/0.11.0")
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
         Self {
-            client: reqwest::Client::new(),
+            client,
             base_url: BASE_URL.to_string(),
             api_key,
         }

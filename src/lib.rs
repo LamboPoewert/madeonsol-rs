@@ -60,7 +60,7 @@ use std::sync::Arc;
 use crate::api::{
     alpha::Alpha, coordination_alerts::CoordinationAlerts, deployer::Deployer,
     first_touch_subscriptions::FirstTouchSubscriptions, kol::Kol, me::Me,
-    price_alerts::PriceAlerts, stream::Stream, token::Token, tools::Tools,
+    price_alerts::PriceAlerts, sniper::Sniper, stream::Stream, token::Token, tools::Tools,
     wallet::Wallet, wallet_tracker::WalletTracker, webhooks::Webhooks,
 };
 use crate::client::HttpCore;
@@ -109,6 +109,8 @@ pub struct MadeOnSol {
     pub first_touch_subscriptions: FirstTouchSubscriptions,
     /// Price-drop / recovery alert rules CRUD (v1.9) — PRO/ULTRA.
     pub price_alerts: PriceAlerts,
+    /// Deshred pre-confirm pump.fun sniper feed + custom watchlist — PRO/ULTRA.
+    pub sniper: Sniper,
     /// Solana tool directory search.
     pub tools: Tools,
     /// WebSocket streaming token issuance.
@@ -153,6 +155,7 @@ impl MadeOnSol {
             coordination_alerts: CoordinationAlerts { core: Arc::clone(&core) },
             first_touch_subscriptions: FirstTouchSubscriptions { core: Arc::clone(&core) },
             price_alerts: PriceAlerts { core: Arc::clone(&core) },
+            sniper: Sniper { core: Arc::clone(&core) },
             tools: Tools { core: Arc::clone(&core) },
             stream: Stream { core: Arc::clone(&core) },
             webhooks: Webhooks { core },

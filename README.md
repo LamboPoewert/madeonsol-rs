@@ -97,6 +97,7 @@ The `MadeOnSol` client exposes namespaced sub-clients:
 | `client.coordination_alerts` | Push alerts on coordinated buying (PRO/ULTRA) |
 | `client.first_touch_subscriptions` | Push alerts on first-KOL-touch events (ULTRA) |
 | `client.price_alerts` *(new 0.10)* | MC-drop / recovery price alert rules CRUD + event history (PRO/ULTRA) |
+| `client.sniper` *(new 0.11)* | **Deshred** pre-confirm pump.fun deploy feed (~500ms head start) + custom deployer watchlist (PRO/ULTRA) |
 | `client.tools` | Solana tool directory search |
 | `client.stream` | Issue 24h WebSocket streaming tokens |
 | `client.webhooks` | Webhook CRUD (PRO/ULTRA) |
@@ -231,6 +232,32 @@ loop {
 ```
 
 **Cost-basis honesty.** Observable only inside the 90-day window. Overflow sells (no matching buy in window) are silently discarded rather than fabricated. `notes.cost_basis_observable_from` makes the cutoff visible.
+
+## Deshred sniper alerts *(new in 0.11)*
+
+The fastest path to a new pump.fun launch. Deploys are reconstructed from shred-level (**deshred**) data and surface **~500ms before the chain confirms them**. **PRO** sees elite + good deployers; **ULTRA** sees every tier and can keep a custom deployer watchlist. For live push use the `sniper:deploy` webhook, the `sniper:deploys` WebSocket channel, or `/alert sniper` in Telegram — these methods are for catch-up, backtesting, and watchlist management.
+
+```rust
+# async fn run(client: madeonsol::MadeOnSol) -> Result<(), Box<dyn std::error::Error>> {
+use madeonsol::types::{SniperRecentParams, SniperWatchlistAddParams};
+
+// Deshred deploy feed — PRO: elite/good · ULTRA: all tiers
+let feed = client.sniper.recent(&SniperRecentParams { limit: Some(50), ..Default::default() }).await?;
+for d in &feed.deploys {
+    println!("{} by {} (tier {:?})", d.symbol.as_deref().unwrap_or("?"), d.deployer_wallet, d.deployer_tier);
+}
+
+// Custom watchlist (ULTRA, max 50) — get deploys from only the deployers you track, any tier
+client.sniper.add_to_watchlist(&SniperWatchlistAddParams {
+    wallets: Some(vec!["7dEx...4pQ8".into(), "9aBc...2zZ1".into()]),
+    label: Some("alpha devs".into()),
+    ..Default::default()
+}).await?;
+let tracked = client.sniper.recent(&SniperRecentParams { watchlist: Some(true), ..Default::default() }).await?;
+println!("{} deploys from watchlisted deployers", tracked.count);
+# Ok(())
+# }
+```
 
 ## Price alerts *(new in 0.10)*
 

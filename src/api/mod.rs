@@ -5,6 +5,7 @@ pub mod first_touch_subscriptions;
 pub mod kol;
 pub mod me;
 pub mod price_alerts;
+pub mod sniper;
 pub mod stream;
 pub mod token;
 pub mod tools;
