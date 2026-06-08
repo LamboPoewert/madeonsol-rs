@@ -1512,6 +1512,14 @@ pub struct DeployerSummary {
     /// Peak market cap (USD) of this deployer's best token to date. Populated on alert rows.
     #[serde(default)]
     pub best_token_peak_mc: Option<f64>,
+    /// Fraction of the deployer's labeled tokens that ran (peak >=60min after deploy) vs dumped.
+    #[serde(default)]
+    pub runner_rate: Option<f64>,
+    /// Confidence denominator; gate on >=3.
+    #[serde(default)]
+    pub labeled_tokens: Option<i64>,
+    #[serde(default)]
+    pub avg_time_to_bond_minutes: Option<i64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -1529,6 +1537,12 @@ pub struct DeployerLeaderboardEntry {
     pub recent_outcomes: Option<String>,
     #[serde(default)]
     pub avg_time_to_bond_minutes: Option<f64>,
+    /// Fraction of the deployer's labeled tokens that ran (peak >=60min after deploy) vs dumped.
+    #[serde(default)]
+    pub runner_rate: Option<f64>,
+    /// Confidence denominator; gate on >=3.
+    #[serde(default)]
+    pub labeled_tokens: Option<i64>,
     #[serde(default)]
     pub best_token_peak_mc: Option<f64>,
     #[serde(default)]
@@ -1575,6 +1589,14 @@ pub struct DeployerProfile {
     pub total_bonded: u32,
     pub last_deploy_at: Option<String>,
     pub first_seen: Option<String>,
+    /// Fraction of the deployer's labeled tokens that ran (peak >=60min after deploy) vs dumped.
+    #[serde(default)]
+    pub runner_rate: Option<f64>,
+    /// Confidence denominator; gate on >=3.
+    #[serde(default)]
+    pub labeled_tokens: Option<i64>,
+    #[serde(default)]
+    pub avg_time_to_bond_minutes: Option<i64>,
     #[serde(default)]
     pub tokens: Option<Vec<DeployerToken>>,
 }
@@ -2259,6 +2281,12 @@ pub struct SniperDeploy {
     pub deployer_bond_rate: Option<f64>,
     pub deployer_total_bonded: Option<i64>,
     pub deployer_recent: Option<String>,
+    /// Fraction of the deployer's labeled tokens that ran (peak >=60min after deploy) vs dumped.
+    #[serde(default)]
+    pub deployer_runner_rate: Option<f64>,
+    /// Confidence denominator; gate on >=3.
+    #[serde(default)]
+    pub deployer_labeled_tokens: Option<i64>,
     pub confirmed_on_chain: Option<bool>,
     pub confirmed_at: Option<String>,
 }

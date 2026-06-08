@@ -18,6 +18,8 @@ async, `tokio`-based, `rustls`-only.
 >
 > **Free tier: 200 requests/day at <https://madeonsol.com/pricing> — no credit card required.**
 
+> **New in 0.12.1** — **Deployer runner-rate fields.** `SniperDeploy`, `DeployerSummary`, `DeployerProfile`, and `DeployerLeaderboardEntry` now carry `runner_rate` (fraction of the deployer's labeled tokens that ran — peak ≥60min after deploy — vs dumped) and `labeled_tokens` (confidence denominator; gate on ≥3).
+
 > **New in 0.12.0** *(2026-06-07)* — **Graduation events + dump-cluster detection.** `GraduationEvent` — typed payload for the `token:graduations` WebSocket channel: every pump.fun bond in real time (tracked deployer or not) with deployer tier, time-to-bond, and MC at bond. `AlphaBuyerQualityBreakdown` adds `dump_cluster_count` (out-of-sample: 3+ such wallets in the first-20 → 94% dump vs 61% base) and `recycled_early_buyer_count`. DEX firehose: replay buffer deepened to ~5 min; mint-scoped subs get in-band `dex:graduations` frames.
 
 > **New in 0.10.0** *(2026-05-25)* — **Price alerts, scout leaderboard, KOL consensus, peak history, coordination history, wallet derived stats, trajectory snapshots.**
