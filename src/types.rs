@@ -429,6 +429,12 @@ pub struct KolLeaderboardEntry {
     pub percentile_pnl_30d: Option<f64>,
     #[serde(default)]
     pub percentile_winrate_30d: Option<f64>,
+    /// Median position hold time in minutes over the trailing 30 days.
+    #[serde(default)]
+    pub median_hold_minutes_30d: Option<f64>,
+    /// Percentile rank for early-entry rate over the trailing 30 days (0–100).
+    #[serde(default)]
+    pub percentile_early_entry_30d: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2128,6 +2134,16 @@ pub struct TokenResponseBody {
     #[serde(default)]
     pub deployer: Option<TokenDeployerInfo>,
     pub kol_activity: TokenKolActivity,
+    /// Liquidity-to-MC ratio (`liquidity_usd / market_cap`). Useful for spotting
+    /// thin-liquidity tokens where price impact is high.
+    #[serde(default)]
+    pub liquidity_to_mc_ratio: Option<f64>,
+    /// Total SOL spent by the first-20 buyers of this token.
+    #[serde(default)]
+    pub launch_cohort_sol: Option<f64>,
+    /// Count of first-20 buyers of this token (0–20).
+    #[serde(default)]
+    pub launch_cohort_size: Option<u32>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2937,6 +2953,15 @@ pub struct TokensListParams {
     pub limit: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offset: Option<u32>,
+    /// Lower bound on `liquidity_to_mc_ratio` (`liquidity_usd / market_cap`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_liq_mc_ratio: Option<f64>,
+    /// Upper bound on `liquidity_to_mc_ratio`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_liq_mc_ratio: Option<f64>,
+    /// Filter tokens by deployer reputation tier (e.g. `"elite"`, `"good"`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deployer_tier: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2957,6 +2982,10 @@ pub struct TokenSummary {
     pub mc_change_1h_pct: Option<f64>,
     pub organic_volume_1h_usd: Option<f64>,
     pub mev_share_pct: Option<f64>,
+    /// Liquidity-to-MC ratio (`liquidity_usd / market_cap`).
+    pub liquidity_to_mc_ratio: Option<f64>,
+    /// Deployer reputation tier (e.g. `"elite"`, `"good"`, `"unranked"`).
+    pub deployer_tier: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

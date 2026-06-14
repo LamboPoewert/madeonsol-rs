@@ -18,6 +18,8 @@ async, `tokio`-based, `rustls`-only.
 >
 > **Free tier: 200 requests/day at <https://madeonsol.com/pricing> — no credit card required.**
 
+> **New in 0.13.0** — **Launch cohort, liquidity/MC ratio, deployer-tier filter, and KOL leaderboard timing.** `TokenResponseBody` gains `liquidity_to_mc_ratio`, `launch_cohort_sol`, and `launch_cohort_size`. `TokensListParams` gains `min_liq_mc_ratio`, `max_liq_mc_ratio`, and `deployer_tier` filters. `TokenSummary` (tokens list items) gains `liquidity_to_mc_ratio` and `deployer_tier`. `KolLeaderboardEntry` gains `median_hold_minutes_30d` and `percentile_early_entry_30d`.
+
 > **New in 0.12.1** — **Deployer runner-rate fields.** `SniperDeploy`, `DeployerSummary`, `DeployerProfile`, and `DeployerLeaderboardEntry` now carry `runner_rate` (fraction of the deployer's labeled tokens that ran — peak ≥60min after deploy — vs dumped) and `labeled_tokens` (confidence denominator; gate on ≥3).
 
 > **New in 0.12.0** *(2026-06-07)* — **Graduation events + dump-cluster detection.** `GraduationEvent` — typed payload for the `token:graduations` WebSocket channel: every pump.fun bond in real time (tracked deployer or not) with deployer tier, time-to-bond, and MC at bond. `AlphaBuyerQualityBreakdown` adds `dump_cluster_count` (out-of-sample: 3+ such wallets in the first-20 → 94% dump vs 61% base) and `recycled_early_buyer_count`. DEX firehose: replay buffer deepened to ~5 min; mint-scoped subs get in-band `dex:graduations` frames.
@@ -46,7 +48,7 @@ Annual: PRO $490/yr, ULTRA $1,490/yr (2 months free).
 
 ```toml
 [dependencies]
-madeonsol = "0.10"
+madeonsol = "0.13"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
