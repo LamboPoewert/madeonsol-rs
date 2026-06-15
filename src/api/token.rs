@@ -57,6 +57,17 @@ impl Token {
             .await
     }
 
+    /// v0.14 — Transparent 0–100 token rug-risk / safety score (PRO/ULTRA).
+    /// Higher means riskier. Returns the overall `risk_score` and `band`
+    /// alongside a per-factor breakdown (mint/freeze authority, liquidity,
+    /// transfer fee, launch cohort, deployer reputation, blacklist, …) and the
+    /// raw `inputs` each factor was derived from — nothing is opaque.
+    pub async fn risk(&self, mint: &str) -> Result<TokenRisk> {
+        self.core
+            .get(&format!("/tokens/{}/risk", mint), &())
+            .await
+    }
+
     /// v0.8 — Filtered, sortable token directory (PRO+). Default `min_liq=2000`
     /// trims the long tail of phantom-MC tokens (low-liq pools producing absurd
     /// VWAP × supply products); set `Some(0.0)` to opt out. Computed filters

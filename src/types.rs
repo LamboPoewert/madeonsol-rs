@@ -2161,6 +2161,104 @@ pub struct TokenBatchResponse {
     pub _rid: Option<String>,
 }
 
+// ─── Token risk score (/tokens/{mint}/risk) ─────────────────────────────────
+
+/// Overall risk band for a token's rug-risk/safety score.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum RiskBand {
+    Safe,
+    Caution,
+    Danger,
+}
+
+impl RiskBand {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Safe => "safe",
+            Self::Caution => "caution",
+            Self::Danger => "danger",
+        }
+    }
+}
+
+/// Per-factor status within a token risk breakdown.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum RiskFactorStatus {
+    Ok,
+    Warn,
+    Danger,
+}
+
+impl RiskFactorStatus {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Ok => "ok",
+            Self::Warn => "warn",
+            Self::Danger => "danger",
+        }
+    }
+}
+
+/// A single contributing factor to a token's risk score.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RiskFactor {
+    /// Stable machine-readable key (e.g. "mint_authority", "liquidity").
+    pub key: String,
+    /// Human-readable label.
+    pub label: String,
+    pub status: RiskFactorStatus,
+    /// Points this factor contributed to the total risk score.
+    pub points: i64,
+    /// Explanatory detail for the factor.
+    pub detail: String,
+}
+
+/// Raw signals the risk score was computed from. Each nullable field is `None`
+/// when the underlying data was unavailable at scoring time.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RiskInputs {
+    #[serde(default)]
+    pub mint_authority_revoked: Option<bool>,
+    #[serde(default)]
+    pub freeze_authority_revoked: Option<bool>,
+    #[serde(default)]
+    pub liquidity_usd: Option<f64>,
+    #[serde(default)]
+    pub liquidity_to_mc_ratio: Option<f64>,
+    pub transfer_fee_bps: i64,
+    pub is_token_2022: bool,
+    pub burn_detected: bool,
+    #[serde(default)]
+    pub launch_cohort_sol: Option<f64>,
+    pub launch_cohort_size: i64,
+    #[serde(default)]
+    pub deployer_bonding_rate: Option<f64>,
+    #[serde(default)]
+    pub deployer_total_deployed: Option<i64>,
+    #[serde(default)]
+    pub kol_signal: Option<String>,
+    pub is_blacklisted: bool,
+}
+
+/// Transparent 0–100 token rug-risk/safety score (PRO/ULTRA). Higher = riskier.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TokenRisk {
+    pub mint: String,
+    /// 0–100, higher = riskier.
+    pub risk_score: u32,
+    pub band: RiskBand,
+    /// Per-factor breakdown that sums into `risk_score`.
+    pub factors: Vec<RiskFactor>,
+    /// Raw inputs the score was derived from.
+    pub inputs: RiskInputs,
+    pub score_version: String,
+    pub as_of: String,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct MintBatchRequest {
     /// 1–50 base58 Solana token mint addresses.
