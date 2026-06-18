@@ -18,6 +18,8 @@ async, `tokio`-based, `rustls`-only.
 >
 > **Free tier: 200 requests/day at <https://madeonsol.com/pricing> — no credit card required.**
 
+> **New in 0.15.0** — **OHLC candles.** `client.token.candles(mint, &params)` returns 1-minute OHLC candles aggregated from the trade firehose (PRO/ULTRA): per-bar `open`/`high`/`low`/`close`, `volume_usd`, `trades`, and `market_cap_usd`. ULTRA unlocks buy/sell volume split (`buy_volume_usd`, `sell_volume_usd`, `net_volume_usd`), open/close liquidity, MC high/low, buy/sell counts, and MEV volume per candle. `CandlesParams` selects `tf`, `limit`, and an optional `from`/`to` window. New types: `CandlesParams`, `Candle`, `CandlesResponse`.
+
 > **New in 0.14.0** — **Token risk score.** `client.token.risk(mint)` returns a transparent 0–100 rug-risk / safety score (PRO/ULTRA, higher = riskier): an overall `risk_score` + `RiskBand` (`safe`/`caution`/`danger`), a per-factor `Vec<RiskFactor>` breakdown (each with `status`, `points`, and a human-readable `detail`), and the raw `RiskInputs` every factor was derived from (mint/freeze authority revocation, liquidity, transfer fee, launch cohort, deployer reputation, blacklist, …). New types: `TokenRisk`, `RiskFactor`, `RiskInputs`, `RiskBand`, `RiskFactorStatus`.
 
 > **New in 0.13.0** — **Launch cohort, liquidity/MC ratio, deployer-tier filter, and KOL leaderboard timing.** `TokenResponseBody` gains `liquidity_to_mc_ratio`, `launch_cohort_sol`, and `launch_cohort_size`. `TokensListParams` gains `min_liq_mc_ratio`, `max_liq_mc_ratio`, and `deployer_tier` filters. `TokenSummary` (tokens list items) gains `liquidity_to_mc_ratio` and `deployer_tier`. `KolLeaderboardEntry` gains `median_hold_minutes_30d` and `percentile_early_entry_30d`.
@@ -100,7 +102,7 @@ The `MadeOnSol` client exposes namespaced sub-clients:
 | `client.kol` | KOL feed, leaderboard, coordination, PnL, trending tokens, alerts, compare, **first_touches**, **scout_leaderboard**, **coordination_history** |
 | `client.deployer` | Pump.fun deployer leaderboard, alerts, trajectory (+ daily snapshots), bonded tokens |
 | `client.alpha` | Alpha-wallet leaderboard, profiles, cap tables, buyer quality |
-| `client.token` | Per-mint snapshot, batch lookup, buyer quality, **kol_consensus**, **peak_history**, **risk**, directory list |
+| `client.token` | Per-mint snapshot, batch lookup, buyer quality, **kol_consensus**, **peak_history**, **risk**, **candles**, directory list |
 | `client.wallet_tracker` | Track arbitrary Solana wallets — watchlist CRUD, swap/transfer history |
 | `client.wallet` | Universal wallet endpoints — stats + cross-product flags + derived analytics, FIFO PnL, open positions, paginated trades (PRO+) |
 | `client.coordination_alerts` | Push alerts on coordinated buying (PRO/ULTRA) |
@@ -328,6 +330,16 @@ println!("{} buyers, {} sellers, exit rate {:?}%",
 // Peak MC history
 let peak = client.token.peak_history("So11111111111111111111111111111111111111112").await?;
 println!("ATH: {:?}, decline: {:?}%", peak.peak_mc_usd, peak.decline_from_peak_pct);
+
+// 1-minute OHLC candles (PRO/ULTRA)
+use madeonsol::types::CandlesParams;
+let candles = client.token.candles(
+    "So11111111111111111111111111111111111111112",
+    &CandlesParams { tf: Some("1m".into()), limit: Some(60), ..Default::default() },
+).await?;
+for c in &candles.candles {
+    println!("{} O:{} H:{} L:{} C:{} vol:${}", c.t, c.open, c.high, c.low, c.close, c.volume_usd);
+}
 # Ok(())
 # }
 ```

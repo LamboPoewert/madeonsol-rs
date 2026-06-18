@@ -1,6 +1,6 @@
 [package]
 name = "madeonsol"
-version = "0.14.0"
+version = "0.15.0"
 edition = "2021"
 rust-version = "1.75"
 description = "Official Rust SDK for the MadeOnSol Solana API — KOL wallet tracking, Pump.fun deployer intelligence, and DEX trade firehose. Free tier: 200 req/day at https://madeonsol.com/pricing"

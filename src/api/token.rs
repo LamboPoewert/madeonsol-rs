@@ -68,6 +68,20 @@ impl Token {
             .await
     }
 
+    /// v0.15 — 1-minute OHLC candles for a token, aggregated from the trade
+    /// firehose. Returns open/high/low/close, USD volume, trade count, and
+    /// market cap per bar. ULTRA unlocks buy/sell volume split, net flow,
+    /// liquidity, MC high/low, and MEV volume per candle.
+    ///
+    /// Use [`CandlesParams`] to pick the timeframe (`tf`), `limit`, and an
+    /// optional `from`/`to` time window — unset params are omitted from the
+    /// query string.
+    pub async fn candles(&self, mint: &str, params: &CandlesParams) -> Result<CandlesResponse> {
+        self.core
+            .get(&format!("/tokens/{}/candles", mint), params)
+            .await
+    }
+
     /// v0.8 — Filtered, sortable token directory (PRO+). Default `min_liq=2000`
     /// trims the long tail of phantom-MC tokens (low-liq pools producing absurd
     /// VWAP × supply products); set `Some(0.0)` to opt out. Computed filters

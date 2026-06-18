@@ -2265,6 +2265,90 @@ pub struct MintBatchRequest {
     pub mints: Vec<String>,
 }
 
+// ─── Token OHLC candles (/tokens/{mint}/candles) ────────────────────────────
+
+/// Query params for [`Token::candles`](crate::api::token::Token::candles).
+/// Unset fields are omitted from the query string.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct CandlesParams {
+    /// Timeframe / bucket size (e.g. "1m"). Defaults server-side when unset.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tf: Option<String>,
+    /// Max number of candles to return.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+    /// Lower bound of the time window (ISO 8601).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+    /// Upper bound of the time window (ISO 8601).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub to: Option<String>,
+}
+
+/// A single OHLC candle. Each nullable field is `None` when the underlying data
+/// was unavailable, and the ULTRA-only fields are absent for lower tiers.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Candle {
+    /// Bucket start time (ISO 8601).
+    pub t: String,
+    pub open: f64,
+    pub high: f64,
+    pub low: f64,
+    pub close: f64,
+    /// Total USD volume traded in the bucket.
+    pub volume_usd: f64,
+    /// Number of trades in the bucket.
+    pub trades: i64,
+    #[serde(default)]
+    pub market_cap_usd: Option<f64>,
+    /// ULTRA — buy-side USD volume.
+    #[serde(default)]
+    pub buy_volume_usd: Option<f64>,
+    /// ULTRA — sell-side USD volume.
+    #[serde(default)]
+    pub sell_volume_usd: Option<f64>,
+    /// ULTRA — net USD flow (buy minus sell).
+    #[serde(default)]
+    pub net_volume_usd: Option<f64>,
+    /// ULTRA — liquidity USD at bucket open.
+    #[serde(default)]
+    pub open_liquidity_usd: Option<f64>,
+    /// ULTRA — liquidity USD at bucket close.
+    #[serde(default)]
+    pub close_liquidity_usd: Option<f64>,
+    /// ULTRA — highest market cap USD in the bucket.
+    #[serde(default)]
+    pub high_mc_usd: Option<f64>,
+    /// ULTRA — lowest market cap USD in the bucket.
+    #[serde(default)]
+    pub low_mc_usd: Option<f64>,
+    /// ULTRA — buy trade count.
+    #[serde(default)]
+    pub buy_count: Option<i64>,
+    /// ULTRA — sell trade count.
+    #[serde(default)]
+    pub sell_count: Option<i64>,
+    /// ULTRA — MEV-attributed USD volume.
+    #[serde(default)]
+    pub volume_mev_usd: Option<f64>,
+}
+
+/// 1-minute OHLC candle series for a token (PRO/ULTRA).
+#[derive(Debug, Clone, Deserialize)]
+pub struct CandlesResponse {
+    pub mint: String,
+    /// Timeframe of each candle (e.g. "1m").
+    pub timeframe: String,
+    /// Lower bound of the returned window (ISO 8601).
+    pub from: String,
+    /// Upper bound of the returned window (ISO 8601).
+    pub to: String,
+    pub count: i64,
+    /// Whether ULTRA net-flow fields are populated on the candles.
+    pub net_flow_included: bool,
+    pub candles: Vec<Candle>,
+}
+
 // ─── Wallet Tracker ─────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]
