@@ -82,6 +82,22 @@ impl Token {
             .await
     }
 
+    /// v0.16 — Aggregated buy/sell flow for a token over a rolling window (PRO+).
+    /// Returns unique wallet/buyer/seller counts, buy/sell counts and SOL volumes,
+    /// `net_sol` (`buy_sol` − `sell_sol`), and `trades_per_wallet`.
+    ///
+    /// Use [`TokenFlowParams`] to pick the `window` (`"1h"` default or `"24h"`) —
+    /// an unset param is omitted from the query string.
+    pub async fn token_flow(
+        &self,
+        mint: &str,
+        params: &TokenFlowParams,
+    ) -> Result<TokenFlowResponse> {
+        self.core
+            .get(&format!("/tokens/{}/flow", mint), params)
+            .await
+    }
+
     /// v0.8 — Filtered, sortable token directory (PRO+). Default `min_liq=2000`
     /// trims the long tail of phantom-MC tokens (low-liq pools producing absurd
     /// VWAP × supply products); set `Some(0.0)` to opt out. Computed filters

@@ -14,7 +14,7 @@ pub(crate) struct HttpCore {
 impl HttpCore {
     pub(crate) fn new(api_key: String) -> Self {
         let client = reqwest::Client::builder()
-            .user_agent("madeonsol-rs/0.11.0")
+            .user_agent("madeonsol-rs/0.17.0")
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
         Self {

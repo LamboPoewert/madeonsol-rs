@@ -1636,6 +1636,9 @@ pub struct DeployerAlert {
     pub created_at: String,
     #[serde(default)]
     pub market_cap_at_alert: Option<f64>,
+    /// Deployer wallet's SOL balance at alert time, in SOL. `None` when unknown.
+    #[serde(default)]
+    pub deployer_sol_balance: Option<f64>,
     pub deployers: DeployerSummary,
     #[serde(default)]
     pub kol_buys: Option<KolBuysSummary>,
@@ -2347,6 +2350,38 @@ pub struct CandlesResponse {
     /// Whether ULTRA net-flow fields are populated on the candles.
     pub net_flow_included: bool,
     pub candles: Vec<Candle>,
+}
+
+// ─── Token flow (/tokens/{mint}/flow) ───────────────────────────────────────
+
+/// Query params for [`Token::token_flow`](crate::api::token::Token::token_flow).
+/// Unset fields are omitted from the query string.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct TokenFlowParams {
+    /// Lookback window — `"1h"` (default) or `"24h"`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub window: Option<String>,
+}
+
+/// Aggregated buy/sell flow for a token over a 1h or 24h window (PRO+).
+#[derive(Debug, Clone, Deserialize)]
+pub struct TokenFlowResponse {
+    pub mint: String,
+    /// Window the figures cover — `"1h"` or `"24h"`.
+    pub window: String,
+    /// Window start time (ISO 8601).
+    pub from: String,
+    pub unique_wallets: f64,
+    pub unique_buyers: f64,
+    pub unique_sellers: f64,
+    pub buy_count: f64,
+    pub sell_count: f64,
+    pub total_trades: f64,
+    pub buy_sol: f64,
+    pub sell_sol: f64,
+    /// Net SOL flow — `buy_sol` minus `sell_sol`.
+    pub net_sol: f64,
+    pub trades_per_wallet: f64,
 }
 
 // ─── Signal Scorecard (/signals) ────────────────────────────────────────────
