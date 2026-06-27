@@ -20,6 +20,8 @@ async, `tokio`-based, `rustls`-only.
 
 > **This is the keyed REST SDK** — authenticate with an API key (`msk_…`). It covers the full endpoint surface (KOL intelligence, deployer intel, token risk/buyer-quality, Signal Scorecard, wallet PnL, DEX firehose). Want **x402 pay-per-call** instead — no signup, your agent's wallet pays per request in USDC? Use the TypeScript [`madeonsol-x402`](https://www.npmjs.com/package/madeonsol-x402) or Python [`madeonsol-x402`](https://pypi.org/project/madeonsol-x402/) clients.
 
+> **New in 0.18.0** — **Almost-bonded tokens + trending sorts.** `client.token.almost_bonded(&params)` (`GET /tokens/almost-bonded`, PRO/ULTRA) returns pre-bond pump.fun tokens near graduation, ranked by velocity: each `AlmostBondedToken` carries `progress_pct`, `velocity_pct_per_min`, `eta_minutes`, a `stalled` flag, `real_sol_reserves`, `market_cap_usd`, `liquidity_usd`, `authorities_revoked`, `deployer_tier`, and `age_minutes`. `AlmostBondedParams` filters by `min_progress`/`max_progress`, `min_velocity_pct_per_min`, `max_age_minutes`, `deployer_tier`, `authority_revoked`, and `min_liq`, and picks the `AlmostBondedSort` order (`VelocityDesc` default, `ProgressDesc`, `EtaAsc`). New types: `AlmostBondedParams`, `AlmostBondedSort`, `AlmostBondedToken`, `AlmostBondedResponse`. `client.token.list(&params)` also accepts four new momentum `sort` values: `"mc_change_5m_desc"`, `"mc_change_1h_desc"`, `"volume_1h_desc"`, and `"trending"`.
+
 > **New in 0.17.0** — **Token flow + deployer SOL balance.** `client.token.token_flow(mint, &params)` (`GET /tokens/{mint}/flow`, PRO+) returns aggregated buy/sell flow for a token over a rolling window: `unique_wallets`/`unique_buyers`/`unique_sellers`, `buy_count`/`sell_count`/`total_trades`, `buy_sol`/`sell_sol`/`net_sol` (buy − sell), and `trades_per_wallet`, plus the window `from` timestamp. `TokenFlowParams { window: Some("24h".into()) }` selects the window (`"1h"` default or `"24h"`). New types: `TokenFlowParams`, `TokenFlowResponse`. `DeployerAlert` also gains `deployer_sol_balance: Option<f64>` — the deployer wallet's SOL balance at alert time.
 
 > **New in 0.16.0** — **Signal Scorecard.** New `client.signals` namespace. `client.signals.catalog()` returns the discovery index — every available signal with its `methodology` and a `performance_endpoint` (`SignalsCatalog`, `SignalCatalogEntry`). `client.signals.performance(name, &params)` returns a named signal's out-of-sample, machine-readable reliability — per-bucket `hit_rate` vs `base_rate`, `lift`, and `sample_n`, plus the test window and `methodology` (`SignalPerformance`, `SignalBucket`). Pass `SignalPerformanceParams { history: Some(true) }` to append the per-day drift series (`SignalHistoryEntry`). Valid signal names: `dump_cluster_count`, `runner_rate`, `recycled_early_buyer_count`, `coordination_count`. Open to any authenticated tier. New types: `SignalPerformanceParams`, `SignalPerformance`, `SignalBucket`, `SignalHistoryEntry`, `SignalsCatalog`, `SignalCatalogEntry`.
@@ -58,7 +60,7 @@ Annual: PRO $490/yr, ULTRA $1,490/yr (2 months free).
 
 ```toml
 [dependencies]
-madeonsol = "0.16"
+madeonsol = "0.18"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 ```
 
@@ -108,7 +110,7 @@ The `MadeOnSol` client exposes namespaced sub-clients:
 | `client.kol` | KOL feed, leaderboard, coordination, PnL, trending tokens, alerts, compare, **first_touches**, **scout_leaderboard**, **coordination_history** |
 | `client.deployer` | Pump.fun deployer leaderboard, alerts, trajectory (+ daily snapshots), bonded tokens |
 | `client.alpha` | Alpha-wallet leaderboard, profiles, cap tables, buyer quality |
-| `client.token` | Per-mint snapshot, batch lookup, buyer quality, **kol_consensus**, **peak_history**, **risk**, **candles**, **token_flow**, directory list |
+| `client.token` | Per-mint snapshot, batch lookup, buyer quality, **kol_consensus**, **peak_history**, **risk**, **candles**, **token_flow**, **almost_bonded**, directory list |
 | `client.wallet_tracker` | Track arbitrary Solana wallets — watchlist CRUD, swap/transfer history |
 | `client.wallet` | Universal wallet endpoints — stats + cross-product flags + derived analytics, FIFO PnL, open positions, paginated trades (PRO+) |
 | `client.coordination_alerts` | Push alerts on coordinated buying (PRO/ULTRA) |

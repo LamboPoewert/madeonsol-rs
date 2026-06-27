@@ -105,7 +105,26 @@ impl Token {
     /// 3× from the DB and filter in app — pagination page size may be smaller
     /// than `limit` when those are set. Check `pagination.post_filtered` to
     /// detect.
+    ///
+    /// `sort` accepts (among others) the momentum values `"mc_change_5m_desc"`,
+    /// `"mc_change_1h_desc"`, `"volume_1h_desc"`, and `"trending"`.
     pub async fn list(&self, params: &TokensListParams) -> Result<TokensListResponse> {
         self.core.get("/tokens", params).await
+    }
+
+    /// v0.18 — Pre-bond pump.fun tokens near graduation, ranked by velocity
+    /// (PRO/ULTRA). Surfaces tokens climbing their bonding curve, with
+    /// `progress_pct`, `velocity_pct_per_min`, `eta_minutes`, and a `stalled`
+    /// flag for momentum that has stopped.
+    ///
+    /// Use [`AlmostBondedParams`] to filter by progress band, velocity floor,
+    /// age, deployer tier, authority-revoked status, and liquidity, and to pick
+    /// the [`AlmostBondedSort`] order (`velocity_desc` default) — unset params
+    /// are omitted from the query string.
+    pub async fn almost_bonded(
+        &self,
+        params: &AlmostBondedParams,
+    ) -> Result<AlmostBondedResponse> {
+        self.core.get("/tokens/almost-bonded", params).await
     }
 }

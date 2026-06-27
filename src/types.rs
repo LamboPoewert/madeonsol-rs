@@ -3507,3 +3507,108 @@ pub struct PriceAlertEventsResponse {
     #[serde(default, rename = "_rid")]
     pub _rid: Option<String>,
 }
+
+// ─── Almost-bonded (/tokens/almost-bonded) — v0.18 ──────────────────────────
+
+/// Sort order for [`Token::almost_bonded`](crate::api::token::Token::almost_bonded).
+/// Defaults to [`AlmostBondedSort::VelocityDesc`] server-side when unset.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AlmostBondedSort {
+    /// Fastest bonding-progress velocity first (default).
+    #[default]
+    VelocityDesc,
+    /// Closest to graduation first.
+    ProgressDesc,
+    /// Shortest estimated time-to-bond first.
+    EtaAsc,
+}
+
+impl AlmostBondedSort {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::VelocityDesc => "velocity_desc",
+            Self::ProgressDesc => "progress_desc",
+            Self::EtaAsc => "eta_asc",
+        }
+    }
+}
+
+/// Query params for [`Token::almost_bonded`](crate::api::token::Token::almost_bonded).
+/// Unset fields are omitted from the query string.
+#[derive(Debug, Clone, Default, Serialize)]
+pub struct AlmostBondedParams {
+    /// Lower bound on bonding progress (percent, 0–100).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_progress: Option<f64>,
+    /// Upper bound on bonding progress (percent, 0–100).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_progress: Option<f64>,
+    /// Lower bound on bonding-progress velocity (percentage points per minute).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_velocity_pct_per_min: Option<f64>,
+    /// Upper bound on token age in minutes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_age_minutes: Option<f64>,
+    /// Filter by deployer reputation tier.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deployer_tier: Option<DeployerTier>,
+    /// Only tokens whose mint+freeze authorities are revoked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authority_revoked: Option<bool>,
+    /// Lower bound on liquidity (USD).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_liq: Option<f64>,
+    /// Sort order — defaults to `velocity_desc`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sort: Option<AlmostBondedSort>,
+    /// Max number of tokens to return.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+/// A pre-bond pump.fun token near graduation. Nullable fields are `None` when
+/// the underlying data was unavailable.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AlmostBondedToken {
+    pub mint: String,
+    #[serde(default)]
+    pub symbol: Option<String>,
+    #[serde(default)]
+    pub name: Option<String>,
+    /// Bonding-curve progress toward graduation (percent, 0–100).
+    pub progress_pct: f64,
+    /// Bonding-progress velocity (percentage points per minute).
+    #[serde(default)]
+    pub velocity_pct_per_min: Option<f64>,
+    /// Estimated minutes until graduation at the current velocity.
+    #[serde(default)]
+    pub eta_minutes: Option<f64>,
+    /// Whether progress has stalled (no recent forward movement).
+    pub stalled: bool,
+    /// Real SOL reserves currently in the bonding curve.
+    #[serde(default)]
+    pub real_sol_reserves: Option<f64>,
+    #[serde(default)]
+    pub market_cap_usd: Option<f64>,
+    #[serde(default)]
+    pub liquidity_usd: Option<f64>,
+    /// Whether mint+freeze authorities are revoked.
+    pub authorities_revoked: bool,
+    /// Deployer reputation tier (e.g. `"elite"`, `"good"`, `"unranked"`).
+    #[serde(default)]
+    pub deployer_tier: Option<String>,
+    #[serde(default)]
+    pub age_minutes: Option<f64>,
+}
+
+/// Pre-bond pump.fun tokens near graduation, ranked by velocity (PRO/ULTRA).
+#[derive(Debug, Clone, Deserialize)]
+pub struct AlmostBondedResponse {
+    pub tokens: Vec<AlmostBondedToken>,
+    pub filters: serde_json::Value,
+    pub returned: u32,
+    pub note: String,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
