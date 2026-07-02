@@ -110,7 +110,7 @@ The `MadeOnSol` client exposes namespaced sub-clients:
 | `client.kol` | KOL feed, leaderboard, coordination, PnL, trending tokens, alerts, compare, **first_touches**, **scout_leaderboard**, **coordination_history** |
 | `client.deployer` | Pump.fun deployer leaderboard, alerts, trajectory (+ daily snapshots), bonded tokens |
 | `client.alpha` | Alpha-wallet leaderboard, profiles, cap tables, buyer quality |
-| `client.token` | Per-mint snapshot, batch lookup, buyer quality, **kol_consensus**, **peak_history**, **risk**, **candles**, **token_flow**, **almost_bonded**, directory list |
+| `client.token` | Per-mint snapshot, batch lookup, buyer quality, **kol_consensus**, **peak_history**, **risk**, **batch_risk**, **candles**, **token_flow**, **almost_bonded**, directory list |
 | `client.wallet_tracker` | Track arbitrary Solana wallets — watchlist CRUD, swap/transfer history |
 | `client.wallet` | Universal wallet endpoints — stats + cross-product flags + derived analytics, FIFO PnL, open positions, paginated trades (PRO+) |
 | `client.coordination_alerts` | Push alerts on coordinated buying (PRO/ULTRA) |
@@ -119,7 +119,7 @@ The `MadeOnSol` client exposes namespaced sub-clients:
 | `client.signals` *(new 0.16)* | **Signal Scorecard** — out-of-sample, machine-readable signal reliability (`performance`) + discovery catalog |
 | `client.sniper` *(new 0.11)* | **Deshred** pre-confirm pump.fun deploy feed (~500ms head start) + custom deployer watchlist (PRO/ULTRA) |
 | `client.tools` | Solana tool directory search |
-| `client.stream` | Issue 24h WebSocket streaming tokens |
+| `client.stream` | Issue 24h WebSocket streaming tokens, **list / kill live sessions** |
 | `client.webhooks` | Webhook CRUD (PRO/ULTRA) |
 
 Full reference: <https://docs.rs/madeonsol> · Interactive API docs: <https://madeonsol.com/api-docs>.
@@ -390,6 +390,35 @@ for b in &perf.buckets {
 # }
 ```
 
+## Batch risk scoring *(new in 0.19)*
+
+Score up to 50 mints for rug-risk in a single round-trip (PRO/ULTRA) — same
+transparent per-factor breakdown as `client.token.risk(mint)`. Untracked mints
+come back as error entries instead of failing the whole batch, so check
+`is_error()` (or match on `error`) before reading the score.
+
+```rust
+# async fn run(client: madeonsol::MadeOnSol) -> Result<(), Box<dyn std::error::Error>> {
+let res = client
+    .token
+    .batch_risk(vec![
+        "So11111111111111111111111111111111111111112".into(),
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".into(),
+    ])
+    .await?;
+
+println!("{} mints scored", res.count);
+for t in res.tokens {
+    if t.is_error() {
+        println!("{}: {}", t.mint, t.error.unwrap_or_default()); // e.g. "not_tracked"
+    } else {
+        println!("{}: risk {:?} ({:?})", t.mint, t.risk_score, t.band);
+    }
+}
+# Ok(())
+# }
+```
+
 ## WebSocket streams (PRO/ULTRA)
 
 This crate does **not** ship a WebSocket client — `client.stream.get_token()`
@@ -407,6 +436,27 @@ let ws_url = format!("{}?token={}", token.ws_url, token.token);
 
 The DEX firehose URL (`token.dex_ws_url`) is only present for ULTRA subscribers.
 See <https://madeonsol.com/api-docs> for the full subscribe/unsubscribe protocol.
+
+### Session management *(new in 0.19)*
+
+List every live socket on your account and force-disconnect a stale one to free
+its connection slot (PRO/ULTRA):
+
+```rust
+# async fn run(client: madeonsol::MadeOnSol) -> Result<(), Box<dyn std::error::Error>> {
+let live = client.stream.sessions().await?;
+for s in &live.sessions {
+    println!("#{} {} {:?} ({} msgs)", s.id, s.service, s.channels, s.messages_sent);
+}
+
+// Kick a ghost socket that's still holding a slot.
+if let Some(s) = live.sessions.first() {
+    let res = client.stream.kill_session(&s.id).await?;
+    println!("evicted {}: {}", res.id, res.evicted);
+}
+# Ok(())
+# }
+```
 
 ## Also available
 

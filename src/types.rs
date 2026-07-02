@@ -2268,6 +2268,59 @@ pub struct MintBatchRequest {
     pub mints: Vec<String>,
 }
 
+// ─── Batch token risk (/tokens/batch/risk) ──────────────────────────────────
+
+/// One entry in a [`Token::batch_risk`](crate::api::token::Token::batch_risk)
+/// response — either a scored result or an error entry for an untracked mint.
+///
+/// A scored result populates the risk fields (`risk_score`, `band`, `factors`,
+/// `inputs`, `score_version`, `as_of`) exactly like [`TokenRisk`], with `error`
+/// set to `None`. An untracked mint comes back as `{ mint, error:
+/// Some("not_tracked") }` with the risk fields left `None`/empty — it does
+/// **not** fail the batch. Use [`is_error`](Self::is_error), or match on
+/// `error`, to tell the two apart.
+#[derive(Debug, Clone, Deserialize)]
+pub struct BatchRiskResult {
+    pub mint: String,
+    /// 0–100, higher = riskier. `None` on an error entry.
+    #[serde(default)]
+    pub risk_score: Option<u32>,
+    #[serde(default)]
+    pub band: Option<RiskBand>,
+    /// Per-factor breakdown that sums into `risk_score`. Empty on an error entry.
+    #[serde(default)]
+    pub factors: Vec<RiskFactor>,
+    /// Raw inputs the score was derived from. `None` on an error entry.
+    #[serde(default)]
+    pub inputs: Option<RiskInputs>,
+    #[serde(default)]
+    pub score_version: Option<String>,
+    /// ISO-8601 scoring timestamp. `None` on an error entry.
+    #[serde(default)]
+    pub as_of: Option<String>,
+    /// `Some("not_tracked")` when the mint isn't tracked; `None` for a scored result.
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+impl BatchRiskResult {
+    /// `true` when this entry is an error (untracked mint) rather than a score.
+    pub fn is_error(&self) -> bool {
+        self.error.is_some()
+    }
+}
+
+/// Response of [`Token::batch_risk`](crate::api::token::Token::batch_risk).
+#[derive(Debug, Clone, Deserialize)]
+pub struct BatchRiskResponse {
+    /// One entry per unique input mint, in de-duplicated input order.
+    pub tokens: Vec<BatchRiskResult>,
+    /// Number of unique mints returned.
+    pub count: u32,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
 // ─── Token OHLC candles (/tokens/{mint}/candles) ────────────────────────────
 
 /// Query params for [`Token::candles`](crate::api::token::Token::candles).
@@ -3116,6 +3169,42 @@ pub struct StreamToken {
     #[serde(default)]
     pub dex_ws_url: Option<String>,
     pub usage: String,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
+/// A single live WebSocket session for your account, as returned by
+/// [`Stream::sessions`](crate::api::stream::Stream::sessions).
+#[derive(Debug, Clone, Deserialize)]
+pub struct StreamSession {
+    /// Numeric session id (serialized as a string). Pass to
+    /// [`Stream::kill_session`](crate::api::stream::Stream::kill_session).
+    pub id: String,
+    /// Originating service: `"ws-streaming"` or `"dex-stream"`.
+    pub service: String,
+    pub tier: String,
+    pub channels: Vec<String>,
+    pub connected_at: String,
+    #[serde(default)]
+    pub remote_ip: Option<String>,
+    /// Messages pushed to this socket so far.
+    pub messages_sent: u64,
+}
+
+/// Response of [`Stream::sessions`](crate::api::stream::Stream::sessions).
+#[derive(Debug, Clone, Deserialize)]
+pub struct StreamSessionsResponse {
+    pub sessions: Vec<StreamSession>,
+    pub count: u32,
+    #[serde(default, rename = "_rid")]
+    pub _rid: Option<String>,
+}
+
+/// Response of [`Stream::kill_session`](crate::api::stream::Stream::kill_session).
+#[derive(Debug, Clone, Deserialize)]
+pub struct StreamSessionEvicted {
+    pub evicted: bool,
+    pub id: String,
     #[serde(default, rename = "_rid")]
     pub _rid: Option<String>,
 }

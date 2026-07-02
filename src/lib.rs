@@ -43,7 +43,7 @@
 //! - [`MadeOnSol::price_alerts`] — price-drop / recovery alert rules CRUD (PRO/ULTRA)
 //! - [`MadeOnSol::signals`] — Signal Scorecard: out-of-sample, machine-readable signal reliability
 //! - [`MadeOnSol::tools`] — Solana tool directory search
-//! - [`MadeOnSol::stream`] — WebSocket streaming token issuance
+//! - [`MadeOnSol::stream`] — WebSocket streaming token issuance + live session list/kill
 //! - [`MadeOnSol::webhooks`] — webhook CRUD (PRO/ULTRA)
 //!
 //! Full API reference: <https://madeonsol.com/api-docs>

@@ -41,6 +41,19 @@ impl Token {
             .await
     }
 
+    /// v0.19 — Batch rug-risk scoring for up to 50 mints in one round-trip
+    /// (PRO/ULTRA). Each tracked mint returns the same transparent
+    /// per-factor breakdown as [`risk`](Self::risk), plus an `as_of` timestamp.
+    /// Untracked mints come back as error entries (`error =
+    /// Some("not_tracked")`) instead of failing the batch — check
+    /// [`BatchRiskResult::is_error`]. `tokens` preserves de-duplicated input
+    /// order; `count` is the number of unique mints.
+    pub async fn batch_risk(&self, mints: Vec<String>) -> Result<BatchRiskResponse> {
+        self.core
+            .post_json("/tokens/batch/risk", &MintBatchRequest { mints })
+            .await
+    }
+
     /// v1.9 — KOL consensus on a token: how many KOLs bought/sold, exit rate,
     /// net flow, median entry MC. ULTRA gets individual wallet arrays.
     pub async fn kol_consensus(&self, mint: &str) -> Result<KolConsensusResponse> {
