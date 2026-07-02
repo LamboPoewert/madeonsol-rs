@@ -2,9 +2,17 @@ name: rust
 # Compiles the crate in the cloud — local cargo is unavailable (Smart App Control)
 # and the prod server has no cargo, so this is the only thing that actually verifies
 # the Rust SDK builds + is publishable before a crates.io release.
+#
+# `build` runs on every push/PR/dispatch (compile + dry-run publish).
+# `publish` runs ONLY on a `v*` tag push or manual dispatch, and ONLY after
+# `build` is green — it does the real `cargo publish` using the CRATES_TOKEN
+# repo secret (Settings → Secrets and variables → Actions → New repository secret,
+# name CRATES_TOKEN, value = a crates.io API token scoped to publish-update).
+# Tag a release with `git tag vX.Y.Z && git push origin vX.Y.Z` and it self-publishes.
 on:
   push:
     branches: [main, master]
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 jobs:
@@ -19,3 +27,18 @@ jobs:
         run: cargo check --all-targets --verbose
       - name: Verify it packages + builds for publish
         run: cargo publish --dry-run --verbose
+
+  publish:
+    # Real publish to crates.io. Only on a version tag or a manual run, and only
+    # if `build` passed. A no-op-with-error if the version already exists on
+    # crates.io (cargo publish refuses to overwrite) — safe to re-run.
+    needs: build
+    if: ${{ startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_TOKEN }}
+        run: cargo publish --verbose
